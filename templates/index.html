@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MoodWeather – Weather Based Playlists</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../static/styles.css" />
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <div class="shell">
+
+    <!-- Top glass navigation bar -->
+    <header class="glass-nav">
+      <div class="nav-left">
+        <div class="logo-icon">🌧️</div>
+        <div class="logo-text">MoodWeather</div>
+      </div>
+      <nav class="nav-links">
+        <a href="#" class="nav-link active">Home</a>
+        <a href="#" class="nav-link">About Project</a>
+        <a href="#" class="nav-link">API Docs</a>
+      </nav>
+    </header>
+
+    <!-- Main glass panel -->
+    <main class="glass-main">
+      <!-- Search bar row -->
+      <section class="search-bar">
+        <form id="location-form" class="search-form">
+          <input
+            id="location-input"
+            type="text"
+            name="location"
+            placeholder="Enter your city to set the mood..."
+            required
+          />
+          <button type="submit" class="primary-btn">
+            Get Mood
+          </button>
+        </form>
+        <p id="status-message" class="status-message"></p>
+      </section>
+
+      <!-- Two-column content: weather + playlist -->
+      <section id="result-section" class="panels hidden">
+        <!-- Weather panel -->
+        <article class="panel panel-weather">
+          <div class="panel-header">
+            <div class="weather-cloud-icon">🌧️</div>
+          </div>
+          <div class="panel-body">
+            <h2 id="result-location" class="location-text">–</h2>
+            <p id="weather-description" class="weather-desc">–</p>
+            <p id="weather-temp" class="weather-temp-large">–</p>
+            <span id="result-mood" class="mood-chip">–</span>
+          </div>
+          <div class="panel-footer">
+            <span class="badge python-badge">
+              🐍 Data via Python Backend
+            </span>
+          </div>
+        </article>
+
+        <!-- Playlist panel -->
+        <article class="panel panel-playlist">
+          <div class="panel-header playlist-header">
+            <div class="playlist-cover">
+              <!-- purely decorative; real cover could come from API later -->
+              <div class="cover-overlay"></div>
+            </div>
+            <div class="playlist-header-text">
+              <h3 id="playlist-name" class="playlist-title">
+                Mood Playlist
+              </h3>
+              <p id="playlist-description" class="playlist-subtitle">
+                Cozy rain vibes, lo-fi beats & chill tunes.
+              </p>
+            </div>
+          </div>
+
+          <div class="panel-body playlist-body">
+            <ul id="playlist-tracks" class="track-list">
+              <!-- JS inserts li.track-item elements here -->
+            </ul>
+
+            <div class="player-bar">
+              <button class="player-btn" type="button" aria-label="Previous">
+                ◀
+              </button>
+              <button class="player-btn play-btn" type="button" aria-label="Play">
+                ▶
+              </button>
+              <button class="player-btn" type="button" aria-label="Next">
+                ▶▶
+              </button>
+              <div class="player-slider">
+                <div class="player-slider-fill"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-footer playlist-footer">
+            <a
+              id="playlist-link"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="badge orange-badge"
+            >
+               Open playlist (Spotify)
+            </a>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      This is just a dummy design for now! we gonna change almost everything
+    </footer>
+  </div>
+
+  <script src="../static/app.js"></script>
+</body>
+</html>
