@@ -1,0 +1,59 @@
+# ---------------------------
+# Python / FastAPI backend
+# ---------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Dependency folders
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# ---------------------------
+# Environment variables
+# ---------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------
+# Logs
+# ---------------------------
+*.log
+logs/
+*.out
+
+# ---------------------------
+# IDE / Editor files
+# ---------------------------
+
+# VSCode
+.vscode/
+.settings/
+
+# PyCharm / JetBrains
+.idea/
+
+
+.DS_Store
+Thumbs.db
+
+
+
+/static/dist/
+/static/build/
+
+
+*.map
+
+
+
