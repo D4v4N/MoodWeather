@@ -1,10 +1,11 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import httpx
 import os
 
+
 router = APIRouter(prefix="/api", tags=["weather"])
-openweather_api_key = os.getenv("OPENWEATHER_API_KEY")
+
 
 class WeatherResponse(BaseModel):
     lat: float
@@ -17,17 +18,23 @@ class WeatherResponse(BaseModel):
     mood: str
 
 @router.get("/weather/{city_name}", response_model=WeatherResponse)
+
 async def get_weather(city_name: str):
-    
+    openweather_api_key = os.getenv("OPENWEATHER_API_KEY")
     """Fetch weather data for a given city and determine mood based on weather conditions."""
 
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={openweather_api_key}&units=metric"
     
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
+
     if response.status_code != 200:
-        return {"error": "City not found or API error"}
+        raise HTTPException(
+            status_code=response.status_code,
+            detail="City not found or API error"
+        )
     data = response.json()
+
 
     lat = data["coord"]["lat"]
     lon = data["coord"]["lon"]
