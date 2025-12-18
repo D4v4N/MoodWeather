@@ -1,22 +1,31 @@
-#main.py
+# main.py
 import os
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(dotenv_path=ENV_PATH)
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
 
 from weather import get_weather, router as weather_router
-from music import get_audius_playlist, router as music_router
+#from music import get_audius_playlist, router as music_router
+from music import audius_test, router as music_router
+
 
 app = FastAPI(title="MoodWeather App")
+
 
 # Inkluderar routers
 app.include_router(weather_router)
 app.include_router(music_router)
 
-
-# hvudlogiken som app.js kommer anropa
+"""
+# huvudlogiken som app.js kommer anropa
 @app.get("/api/recommend")
 async def recommend(location: str):
     weather_info = await get_weather(location)
@@ -52,10 +61,10 @@ async def recommend(location: str):
             "tracks": []
         }
     }
-
+"""
 
 # servera frontend-filer
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+#app.mount("/", StaticFiles(directory=".", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
