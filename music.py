@@ -4,12 +4,9 @@ import os
 import httpx
 
 router = APIRouter(prefix="/api", tags=["music"])
+AUDIUS_API_URL = "https://api.audius.co/v1/playlists/search"
 
-@router.get("/music/ping")
-async def ping():
-    return {"pong": True}
-
-
+#Test funktion för API:t
 @router.get("/music/test")
 async def audius_test():
     api_key = os.getenv("AUDIUS_API_KEY")
@@ -32,38 +29,65 @@ async def audius_test():
         "first": (data.get("data") or [None])[0],
     }
 
+#Hämta EN spellista från Audius baserat på mood/sökord
+#returnerar den första träffen eller none om inget hittas
 
+async def get_audius_playlist(mood_query: str):
 
+    # säkerställ att vi har API-nyckel
+    api_key = os.getenv("AUDIUS_API_KEY")
+    if not api_key:
+        return None
 
-"""
-from fastapi import APIRouter
-import httpx
-import os
-
-router = APIRouter(prefix="/api", tags=["music"])
-
-AUDIUS_API_KEY = os.getenv("AUDIUS_API_KEY")
-
-async def get_audius_playlist(mood_keyword: str):
-
-    """#Söker efter spellistor på Audius med API-nyckel."""
-"""
-    host_url = "https://discoveryprovider.audius.co/v1"
-
-    search_url = f"{host_url}/playlists/search"
+    # förbered anrop till Audius
     params = {
-        "query": mood_keyword,
-        "api_key": AUDIUS_API_KEY
+        "query": mood_query,
+        "limit": 10,
+        "api_key": api_key
     }
 
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(search_url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                playlists = data.get("data", [])
-                return playlists[0] if playlists else None
-        except Exception as e:
-            print(f"Error fetching music: {e}")
-            return None
-"""
+    # Fråga Audius, men inte vänta för länge
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(AUDIUS_API_URL, params=params)
+    except httpx.RequestError:
+        #nätverksfel, audius nere eller liknande
+        return None
+
+    # Kontrollera att audius svarade
+    if r.status_code != 200:
+        return None
+
+    # plocka ut första spellistan om det finns någon
+    playlists = r.json().get("data", [])
+    if not playlists:
+        return None
+
+    mood = mood_query.lower()
+
+    # filtrera så att mood-orden inte inkluderar användarnamn
+    filtered = []
+    for p in playlists:
+        name = (p.get("playlist_name") or "").lower()
+        description = (p.get("description") or "").lower()
+
+        if mood in name or mood in description:
+            filtered.append(p)
+
+    # 2️⃣ Om vi hittade "äkta" träffar → ta första
+    if filtered:
+        return filtered[0]
+
+    return playlists[0]
+
+@router.get("/music/search")
+async def search_playlist(q: str):
+    playlist = await get_audius_playlist(q)
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Ingen spellista hittades")
+    return {
+        "id": playlist.get("id"),
+        "name": playlist.get("playlist_name") or playlist.get("name"),
+        "description": playlist.get("description"),
+        "permalink": playlist.get("permalink"),
+    }

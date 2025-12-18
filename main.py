@@ -13,8 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 from weather import get_weather, router as weather_router
-#from music import get_audius_playlist, router as music_router
-from music import audius_test, router as music_router
+from music import get_audius_playlist, router as music_router
 
 
 app = FastAPI(title="MoodWeather App")
@@ -24,7 +23,7 @@ app = FastAPI(title="MoodWeather App")
 app.include_router(weather_router)
 app.include_router(music_router)
 
-"""
+
 # huvudlogiken som app.js kommer anropa
 @app.get("/api/recommend")
 async def recommend(location: str):
@@ -61,7 +60,6 @@ async def recommend(location: str):
             "tracks": []
         }
     }
-"""
 
 # servera frontend-filer
 #app.mount("/", StaticFiles(directory=".", html=True), name="static")
