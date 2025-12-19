@@ -13,8 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 from weather import get_weather, router as weather_router
-from music import get_audius_playlist, router as music_router
-
+from music import get_audius_playlist, router as music_router, get_audius_playlists, pick_random_playlist
 
 app = FastAPI(title="MoodWeather App")
 
@@ -38,10 +37,26 @@ async def recommend(location: str):
         "sad": "lofi rain chill",
         "neutral": "peaceful ambient"
     }
-    query = mood_map.get(weather_info.mood, "chill")
+    mood_query = mood_map.get(weather_info.mood, "chill")
 
-    # Hämta musik
-    playlist = await get_audius_playlist(query)
+    # Hämta flera spelistor som matchar moodet
+    playlist = await get_audius_playlists(mood_query, limit=15)
+
+    # välj mellan dessa slumpmässigt
+    playlist = pick_random_playlist(playlist)
+    if not playlist:
+        playlist_payload = None
+    else:
+        playlist_payload = {
+            "id": playlist.get("id"),
+            "name": playlist.get("name") or playlist.get("playlist_name"),
+            "description": playlist.get("description") or "",
+            "permalink": playlist.get("permalink"),
+            "url": f"https://audius.co/playlists/{playlist.get('id')}" if playlist else "#",
+        }
+
+    # TO-DO:
+    # Skapa en token som frontend kan använda för att "generate new playlist"
 
     return {
         "location": weather_info.city,
@@ -51,14 +66,13 @@ async def recommend(location: str):
         },
         "mood": {
             "key": weather_info.mood,
-            "label": weather_info.mood.capitalize()
+            "label": weather_info.mood.capitalize(),
+            "query": mood_query
         },
-        "playlist": {
-            "name": playlist.get("playlist_name") if playlist else "No playlist found",
-            "description": playlist.get("description") if playlist else "",
-            "url": f"https://audius.co/playlists/{playlist.get('id')}" if playlist else "#",
-            "tracks": []
-        }
+        "playlist": playlist_payload
+        # HÄR BEHÖVER VI RETURNERA ETT REKOMENDATIONS ID SOM HÅLLER KOLL
+        # PÅ VILKA REKOMENDATIONER VI GJORT
+        # ex "recommendation_id": rec_id
     }
 
 # servera frontend-filer
