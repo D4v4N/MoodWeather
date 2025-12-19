@@ -74,7 +74,7 @@ async def get_audius_playlist(mood_query: str):
         if mood in name or mood in description:
             filtered.append(p)
 
-    # 2️⃣ Om vi hittade "äkta" träffar → ta första
+    # ta första listan om filtrering lyckades
     if filtered:
         return filtered[0]
 
