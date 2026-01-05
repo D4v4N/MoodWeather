@@ -11,7 +11,7 @@ _rng = random.SystemRandom()
 
 
 
-#Test funktion för API:t
+#Test funktion för API:t - kan tas bort
 @router.get("/music/test")
 async def audius_test():
     api_key = os.getenv("AUDIUS_API_KEY")
@@ -155,6 +155,8 @@ async def search_playlist(q: str):
 
 # TO-DO: NY ENDPOINT : GET - regenerate_playlist
 # async def regenerate_playlist(recommendation_id:str):
+# måste använda id:s (ex last_id) och exclude så föregående spellista ej rekomenderas igen
+# sätt state = last_playlist_id så den spellista som är vald nu inte blir vald igen
 
 
 
