@@ -7,10 +7,11 @@ const resultLocation = document.getElementById("result-location");
 const resultMood = document.getElementById("result-mood");
 const weatherDescription = document.getElementById("weather-description");
 const weatherTemp = document.getElementById("weather-temp");
+
 const playlistName = document.getElementById("playlist-name");
 const playlistDescription = document.getElementById("playlist-description");
-const playlistTracks = document.getElementById("playlist-tracks");
 const playlistLink = document.getElementById("playlist-link");
+const playlistCover = document.querySelector(".playlist-cover");
 
 // --- Event handler ---
 form.addEventListener("submit", async (e) => {
@@ -26,19 +27,31 @@ form.addEventListener("submit", async (e) => {
   resultSection.classList.add("hidden");
 
   try {
-    const response = await fetch(`/api/weather/${city}`);
-
-    if (!response.ok) {
-      throw new Error("City not found");
-    }
-
+    const response = await fetch(`/api/recommend?location=${encodeURIComponent(city)}`);
     const data = await response.json();
 
-    // Update UI with backend data
-    resultLocation.textContent = data.city;
-    weatherDescription.textContent = data.description;
-    weatherTemp.textContent = `${Math.round(data.temperature)} °C`;
-    resultMood.textContent = data.mood.toUpperCase();
+    if (data.error) {
+        throw new Error(data.error);
+    }
+
+    // Update UI: Weather
+    resultLocation.textContent = data.location;
+    weatherDescription.textContent = data.weather.description;
+    weatherTemp.textContent = `${Math.round(data.weather.temperature)} °C`;
+    resultMood.textContent = data.weather.mood_key.toUpperCase();
+
+    // Update UI: Audius
+    playlistName.textContent = data.playlist.name;
+    const desc = data.playlist.description ||"No description available"
+    playlistDescription.textContent = desc.length > 100 ? desc.substring(0, 97) + "..." : desc;
+
+    playlistLink.href = data.playlist.url;
+    playlistLink.textContent = "Listen on Audius";
+
+    //Uppdaterar bild om Audius skickar med en
+    if (data.playlist.artwork) {
+        playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
+    }
 
     setStatus("");
     resultSection.classList.remove("hidden");
