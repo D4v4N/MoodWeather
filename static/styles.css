@@ -547,3 +547,24 @@ body {
     width: 100%;
   }
 }
+
+/* === Lucide icons fix === */
+.logo-icon,
+.weather-cloud-icon {
+  color: #ffffff;              /* gör ikonen ljus */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Storlek på ikonerna */
+.logo-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.weather-cloud-icon svg {
+  width: 44px;
+  height: 44px;
+}
+

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>MoodWeather – Weather Based Playlists</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="../static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <div class="page-bg"></div>
@@ -14,7 +14,9 @@
     <!-- Top glass navigation bar -->
     <header class="glass-nav">
       <div class="nav-left">
-        <div class="logo-icon">🌧️</div>
+        <div class="logo-icon">
+          <i id="weather-icon" data-lucide="cloud"></i>
+        </div>
         <div class="logo-text">MoodWeather</div>
       </div>
       <nav class="nav-links">
@@ -48,7 +50,9 @@
         <!-- Weather panel -->
         <article class="panel panel-weather">
           <div class="panel-header">
-            <div class="weather-cloud-icon">🌧️</div>
+            <div class="weather-cloud-icon">
+              <i id="weather-icon-big" data-lucide="cloud"></i>
+            </div>
           </div>
           <div class="panel-body">
             <h2 id="result-location" class="location-text">–</h2>
@@ -121,6 +125,7 @@
     </footer>
   </div>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="../static/app.js"></script>
 </body>
 </html>
