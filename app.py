@@ -2,13 +2,14 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 from pathlib import Path
-from fastapi import FastAPI, Request
+from uuid import uuid4
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from weather import get_weather, router as weather_router
-from music import get_audius_playlist, router as music_router
+from music import get_audius_playlists, router as music_router, pick_random_playlist, to_playlist_payload
 
 # Hantera sökvägar för .env
 BASE_DIR = Path(__file__).resolve().parent
@@ -35,6 +36,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates (HTML)
 templates = Jinja2Templates(directory="templates")
 
+#In-memory state för att kunna slumpa fram ny speliista utan ny vädersäkning
+recommendation_state = {}
+
 @app.get("/api/recommend")
 async def recommend(location: str):
     # hämtar väder
@@ -49,10 +53,26 @@ async def recommend(location: str):
         "sad": "lofi rain chill",
         "neutral": "peaceful ambient"
     }
-    query = mood_map.get(weather_info.mood, "chill")
+    mood_query = mood_map.get(weather_info.mood, "chill")
 
     # hämtar musik
-    playlist = await get_audius_playlist(query)
+    playlists = await get_audius_playlists(mood_query, limit=15)
+    if not playlists:
+        raise HTTPException(status_code=404, detail="No playlists found")
+
+    playlist = pick_random_playlist(playlists)
+    if not playlist:
+        raise HTTPException(status_code=404, detail="No playlist could be selected")
+
+    playlist_payload = to_playlist_payload(playlist)
+
+    #spara state för att kunna generera ny spellist
+    rec_id = str(uuid4())
+    recommendation_state[rec_id] = {
+        "mood_query": mood_query,
+       # "index":0, #för att även implementera "next"
+        "last_playlist_id": str(playlist.get("id")),
+    }
 
     return {
         "location": weather_info.city,
@@ -61,12 +81,34 @@ async def recommend(location: str):
             "temperature": weather_info.temperature,
             "mood_key": weather_info.mood
         },
-        "playlist": {
-            "name": playlist.get("playlist_name") if playlist else "No playlist found",
-            "description": playlist.get("description") if playlist else "",
-            "url": f"https://audius.co/playlists/{playlist.get('id')}" if playlist else "#",
-            "artwork": playlist.get("artwork", {}).get("150x150") if playlist else None
-        }
+        "playlist": playlist_payload,
+        "recommendation_id": rec_id
+    }
+@app.get("/api/recommend/regenerate")
+async def regenerate(recommendation_id: str):
+    """mode = shuffle för ny spellista """
+    state = recommendation_state.get(recommendation_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Recommendation id not found")
+
+    mood_query = state["mood_query"]
+    last_id = state.get("last_playlist_id")
+
+    playlists = await get_audius_playlists(mood_query, limit=15)
+    if not playlists:
+        raise HTTPException(status_code=404, detail="No playlists found")
+
+    #hoppa över den spellistan som senast visades
+    playlist = pick_random_playlist(playlists, exclude_ids={last_id} if last_id else None)
+    if not playlists:
+        raise HTTPException(status_code=404, detail="No new playlists found")
+
+    #uppdatera state så nästa generering inte tar föregående
+    state["last_playlist_id"] = str(playlist.get("id"))
+
+    return {
+        "mood_query": mood_query,
+        "playlist": to_playlist_payload(playlist)
     }
 
 # Serve frontend

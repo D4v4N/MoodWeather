@@ -2,13 +2,19 @@
 from fastapi import APIRouter, HTTPException
 import os
 import httpx
+import random
+from typing import Optional, Set, List, Dict, Any
 
 router = APIRouter(prefix="/api", tags=["music"])
 AUDIUS_API_URL = "https://api.audius.co/v1/playlists/search"
 
+_rng = random.SystemRandom()
+
 #Test funktion för API:t
 @router.get("/music/test")
 async def audius_test():
+    """Dev-test: bekräftar att Audius funkar och visar ett exempelobjekt."""
+
     api_key = os.getenv("AUDIUS_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AUDIUS_API_KEY saknas")
@@ -29,65 +35,75 @@ async def audius_test():
         "first": (data.get("data") or [None])[0],
     }
 
-#Hämta EN spellista från Audius baserat på mood/sökord
-#returnerar den första träffen eller none om inget hittas
-
-async def get_audius_playlist(mood_query: str):
-
+async def get_audius_playlists(mood_query: str, limit: int = 15):
+    """
+        Hämtar flera spellistor från Audius.
+        Filtrerar så att mood-ordet matchar playlist-namn eller beskrivning
+        användarnamn).
+        """
     # säkerställ att vi har API-nyckel
     api_key = os.getenv("AUDIUS_API_KEY")
     if not api_key:
-        return None
+        return []
 
     # förbered anrop till Audius
     params = {
         "query": mood_query,
-        "limit": 10,
+        "limit": limit,
         "api_key": api_key
     }
 
-    # Fråga Audius, men inte vänta för länge
+    # Fråga Audius, med tidsgräns
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.get(AUDIUS_API_URL, params=params)
     except httpx.RequestError:
         #nätverksfel, audius nere eller liknande
-        return None
+        return []
 
     # Kontrollera att audius svarade
     if r.status_code != 200:
-        return None
+        return []
 
     # plocka ut första spellistan om det finns någon
-    playlists = r.json().get("data", [])
+    playlists = r.json().get("data", []) or []
     if not playlists:
-        return None
+        return []
 
-    mood = mood_query.lower()
+    mood = mood_query.lower().strip()
 
     # filtrera så att mood-orden inte inkluderar användarnamn
     filtered = []
     for p in playlists:
         name = (p.get("playlist_name") or "").lower()
         description = (p.get("description") or "").lower()
-
         if mood in name or mood in description:
             filtered.append(p)
 
-    # ta första listan om filtrering lyckades
-    if filtered:
-        return filtered[0]
+    return filtered if filtered else playlists
 
-    return playlists[0]
+def pick_random_playlist(playlists: list, exclude_ids: set[str] | None = None):
+    """Väljer en slumpad playlist, och kan undvika vissa ID:n (t.ex. senaste)."""
 
-@router.get("/music/search")
-async def search_playlist(q: str):
-    playlist = await get_audius_playlist(q)
-    if not playlist:
-        raise HTTPException(status_code=404, detail="Ingen spellista hittades")
+    exclude_ids = exclude_ids or set()
+
+    candidates = [p for p in playlists if str(p.get("id")) not in exclude_ids]
+    if not candidates:
+        return None
+
+    return _rng.choice(candidates)
+
+def to_playlist_payload(p: Optional[Dict[str, Any]]):
+    """definierar liten payload till frontenden"""
+    if not p:
+        return None
+
+    permalink = p.get("permalink")
     return {
-        "id": playlist.get("id"),
-        "name": playlist.get("playlist_name") or playlist.get("name"),
-        "description": playlist.get("description"),
-        "permalink": playlist.get("permalink"),
+        "id": p.get("id"),
+        "name": p.get("playlist_name") or p.get("name"),
+        "description": p.get("description") or "",
+        "permalink": permalink,
+        "url": f"https://audius.co{permalink}" if permalink else f"https://audius.co/playlists/{p.get('id')}",
+        "artwork": (p.get("artwork") or {}).get("150x150"),
     }
