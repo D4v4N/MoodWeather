@@ -42,6 +42,8 @@ const playlistDescription = document.getElementById("playlist-description");
 const playlistLink = document.getElementById("playlist-link");
 const playlistCover = document.querySelector(".playlist-cover");
 
+let recommendationId = null;
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -57,6 +59,7 @@ form.addEventListener("submit", async (e) => {
   try {
     const response = await fetch(`/api/recommend?location=${encodeURIComponent(city)}`);
     const data = await response.json();
+    recommendationId = data.recommendation_id;
 
     if (data.error) throw new Error(data.error);
 
@@ -123,7 +126,64 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+//regenerate new playlist-knappen i playerbar
+const shuffleBtn = document.getElementById("shuffle-btn");
+
+if (shuffleBtn) {
+ shuffleBtn.addEventListener("click", async () => {
+  if (!recommendationId) {
+   setStatus("Fetch recommendation first.", true);
+   return;
+   }
+
+ try {
+  setStatus("Randomizing new playlist...")
+
+  const res = await fetch(
+    `/api/recommend/regenerate?recommendation_id=${encodeURIComponent(recommendationId)}`
+  );
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.detail || "Couldn't generate new playlist");
+  }
+
+  //uppdatera endast playlistdelen
+  playlistName.textContent = data.playlist.name;
+
+  const desc = data.playlist.description || "No description available";
+  playlistDescription.textContent =
+    desc.length > 100 ? desc.substring(0, 97) + "..." : desc;
+
+  playlistLink.href = data.playlist.url;
+
+   if (data.playlist.artwork) {
+    playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
+   }
+
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't ramdomize new playlist", true)
+   }
+  });
+ }
+
+/* SKA VI HA DENNA? BARA ELLER BÅDA?
+//"suggest new playlist"-knappen
+document.addEventListener("click", (e) => {
+  const suggestBtn = e.target.closest("#suggest-btn");
+  if (!suggestBtn) return;
+
+  const shuffleBtn = document.getElementById("shuffle-btn");
+  if (shuffleBtn) {
+    shuffleBtn.click();
+  }
+});
+*/
+
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
 }
+
