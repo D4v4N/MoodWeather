@@ -98,12 +98,12 @@ def to_playlist_payload(p: Optional[Dict[str, Any]]):
     if not p:
         return None
 
-    permalink = p.get("permalink")
+    playlist_id = p.get("id")
+
     return {
-        "id": p.get("id"),
+        "id": playlist_id,
         "name": p.get("playlist_name") or p.get("name"),
         "description": p.get("description") or "",
-        "permalink": permalink,
-        "url": f"https://audius.co{permalink}" if permalink else f"https://audius.co/playlists/{p.get('id')}",
+        "url": f"https://audius.co/playlists/{playlist_id}",
         "artwork": (p.get("artwork") or {}).get("150x150"),
     }
