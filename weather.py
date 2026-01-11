@@ -21,6 +21,11 @@ class WeatherResponse(BaseModel):
 
 async def get_weather(city_name: str):
     openweather_api_key = os.getenv("OPENWEATHER_API_KEY")
+    if not openweather_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="OPENWEATHER_API_KEY is missing (env not loaded)"
+        )
     """Fetch weather data for a given city and determine mood based on weather conditions."""
 
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={openweather_api_key}&units=metric"
