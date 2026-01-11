@@ -2,10 +2,24 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from the project root BEFORE other imports
+# Load .env BEFORE other imports (try a few likely locations)
 BASE_DIR = Path(__file__).resolve().parent
-ENV_PATH = BASE_DIR / ".env"
-load_dotenv(dotenv_path=ENV_PATH)
+
+def _load_env() -> Path:
+    candidates = [
+        BASE_DIR / ".env",
+        BASE_DIR.parent / ".env",
+        BASE_DIR.parent.parent / ".env",
+    ]
+    for p in candidates:
+        if p.exists():
+            load_dotenv(dotenv_path=p, override=True)
+            return p
+    # Fallback: try default behaviour (current working dir), and return the primary candidate
+    load_dotenv(override=True)
+    return candidates[0]
+
+ENV_PATH = _load_env()
 
 from uuid import uuid4
 from fastapi import FastAPI, Request, HTTPException
@@ -42,50 +56,57 @@ recommendation_state = {}
 
 @app.get("/api/recommend")
 async def recommend(location: str):
-    # hämtar väder
+    # hämta väder (låter FastAPI skicka rätt statuskod vid fel)
     try:
         weather_info = await get_weather(location)
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Build Audius queries from the richer weather profile (keywords computed in weather.py)
-    keywords = weather_info.keywords or []
+    try:
+        # Build Audius queries from the richer weather profile (keywords computed in weather.py)
+        keywords = weather_info.keywords or []
 
-    # Fallback if keywords aren't available for any reason
-    if not keywords:
-        mood_map = {
-            "happy": ["sunny", "upbeat", "dance"],
-            "sad": ["lofi", "rain", "chill"],
-            "neutral": ["ambient", "peaceful", "instrumental"],
-        }
-        keywords = mood_map.get(weather_info.mood, ["chill"])
+        # Fallback if keywords aren't available for any reason
+        if not keywords:
+            mood_map = {
+                "happy": ["sunny", "upbeat", "dance"],
+                "sad": ["lofi", "rain", "chill"],
+                "neutral": ["ambient", "peaceful", "instrumental"],
+            }
+            keywords = mood_map.get(weather_info.mood, ["chill"])
 
-    queries = build_audius_queries(keywords, max_queries=6)
+        queries = build_audius_queries(keywords, max_queries=6)
 
-    # Fetch playlists from multiple queries, then rank them (avoid being overly random)
-    all_playlists = []
-    dedup = set()
+        # Fetch playlists from multiple queries, then rank them (avoid being overly random)
+        all_playlists = []
+        dedup = set()
 
-    for q in queries:
-        items = await get_audius_playlists(q, limit=15)
-        for p in items:
-            pid = p.get("id")
-            if pid and pid not in dedup:
-                dedup.add(pid)
-                all_playlists.append(p)
+        for q in queries:
+            items = await get_audius_playlists(q, limit=15)
+            for p in items:
+                pid = p.get("id")
+                if pid and pid not in dedup:
+                    dedup.add(pid)
+                    all_playlists.append(p)
 
-    playlist = pick_best_playlist(all_playlists, keywords)
-    if not playlist:
-        # Fallback: keep old behavior if ranking yields nothing
+        playlist = pick_best_playlist(all_playlists, keywords)
+        if not playlist:
+            # Fallback: keep old behavior if ranking yields nothing
+            mood_query = queries[0] if queries else "chill"
+            fallback = await get_audius_playlists(mood_query, limit=15)
+            playlist = pick_random_playlist(fallback)
+
+        if not playlist:
+            raise HTTPException(status_code=404, detail="No playlist could be selected")
+
         mood_query = queries[0] if queries else "chill"
-        fallback = await get_audius_playlists(mood_query, limit=15)
-        playlist = pick_random_playlist(fallback)
-
-    if not playlist:
-        raise HTTPException(status_code=404, detail="No playlist could be selected")
-
-    mood_query = queries[0] if queries else "chill"
-    playlist_payload = to_playlist_payload(playlist)
+        playlist_payload = to_playlist_payload(playlist)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audius selection failed: {e!r}")
 
     #spara state för att kunna generera ny spellist
     rec_id = str(uuid4())
@@ -103,6 +124,9 @@ async def recommend(location: str):
             "temperature": weather_info.temperature,
             "mood_key": weather_info.mood
         },
+        "mood_query": mood_query,
+        "bucket": getattr(weather_info, "bucket", None),
+        "keywords": keywords,
         "playlist": playlist_payload,
         "recommendation_id": rec_id
     }
@@ -120,36 +144,64 @@ async def regenerate(recommendation_id: str):
     keywords = state.get("keywords") or ["chill"]
     last_id = state.get("last_playlist_id")
 
-    queries = build_audius_queries(keywords, max_queries=6)
+    try:
+        queries = build_audius_queries(keywords, max_queries=6)
 
-    all_playlists = []
-    dedup = set()
+        all_playlists = []
+        dedup = set()
 
-    for q in queries:
-        items = await get_audius_playlists(q, limit=15)
-        for p in items:
-            pid = p.get("id")
-            if pid and pid not in dedup:
-                dedup.add(pid)
-                all_playlists.append(p)
+        for q in queries:
+            items = await get_audius_playlists(q, limit=15)
+            for p in items:
+                pid = p.get("id")
+                if pid and pid not in dedup:
+                    dedup.add(pid)
+                    all_playlists.append(p)
 
-    # Prefer a ranked pick that isn't the last shown playlist
-    exclude = {last_id} if last_id else set()
-    playlist = pick_best_playlist(all_playlists, keywords, exclude_ids=exclude)
+        # Prefer a ranked pick that isn't the last shown playlist
+        exclude = {last_id} if last_id else set()
+        playlist = pick_best_playlist(all_playlists, keywords, exclude_ids=exclude)
 
-    if not playlist:
-        # Fallback: random but still avoid repeats
-        fallback = await get_audius_playlists(mood_query, limit=15)
-        playlist = pick_random_playlist(fallback, exclude_ids=exclude)
+        if not playlist:
+            # Fallback: random but still avoid repeats
+            fallback = await get_audius_playlists(mood_query, limit=15)
+            playlist = pick_random_playlist(fallback, exclude_ids=exclude)
 
-    if not playlist:
-        raise HTTPException(status_code=404, detail="No new playlists found")
+        if not playlist:
+            raise HTTPException(status_code=404, detail="No new playlists found")
 
-    state["last_playlist_id"] = str(playlist.get("id"))
+        state["last_playlist_id"] = str(playlist.get("id"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audius regenerate failed: {e!r}")
 
     return {
         "mood_query": mood_query,
         "playlist": to_playlist_payload(playlist)
+    }
+
+@app.get("/api/debug/env")
+async def debug_env():
+    """
+    Debug helper: confirms whether the OpenWeather key is loaded.
+    Does NOT reveal the key (only its length and last 4 chars).
+    """
+    key = os.getenv("OPENWEATHER_API_KEY") or ""
+
+    candidates = [
+        str((BASE_DIR / ".env").resolve()),
+        str((BASE_DIR.parent / ".env").resolve()),
+        str((BASE_DIR.parent.parent / ".env").resolve()),
+    ]
+
+    return {
+        "env_path_used": str(ENV_PATH),
+        "env_file_exists": ENV_PATH.exists(),
+        "env_candidates_checked": candidates,
+        "openweather_key_loaded": bool(key),
+        "openweather_key_length": len(key),
+        "openweather_key_last4": key[-4:] if len(key) >= 4 else "",
     }
 
 # Serve frontend

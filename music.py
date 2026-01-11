@@ -1,213 +1,276 @@
-# music.py
-from fastapi import APIRouter, HTTPException
+from __future__ import annotations
+
 import os
-import httpx
 import random
-from typing import Optional, Set, List, Dict, Any, Iterable, Tuple
+import re
+import time
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-router = APIRouter(prefix="/api", tags=["music"])
-AUDIUS_API_URL = "https://api.audius.co/v1/playlists/search"
+import httpx
+from fastapi import APIRouter, HTTPException
 
-_rng = random.SystemRandom()
+router = APIRouter(prefix="/api/music", tags=["music"])
 
-def _norm_text(value: str) -> str:
-    return (value or "").strip().lower()
+# Audius uses a network of “discovery providers”. We pick one and cache it.
+_DISCOVERY_PROVIDER: Optional[str] = None
+_DISCOVERY_PROVIDER_TS: float = 0.0
+_DISCOVERY_TTL_SECONDS = 60 * 30  # refresh every 30 minutes
+
+APP_NAME = (os.getenv("AUDIUS_APP_NAME", "MoodWeather") or "MoodWeather").strip()
+
+# A safe fallback if api.audius.co is flaky
+FALLBACK_PROVIDER = "https://discoveryprovider.audius.co"
 
 
-def build_audius_queries(keywords: List[str], max_queries: int = 6) -> List[str]:
+def _now() -> float:
+    return time.time()
+
+
+async def _http_get_json(url: str, params: Optional[dict] = None, timeout: float = 12.0) -> dict:
     """
-    Build short, effective search queries for Audius from a keyword list.
-
-    Idea:
-      - Make a few 2-word combinations (more specific)
-      - Add a few single keywords (broader fallback)
+    Small helper with sane error handling.
+    If Audius has hiccups, we raise a useful HTTPException.
     """
-    kws = [_norm_text(k) for k in (keywords or []) if _norm_text(k)]
-    if not kws:
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            r = await client.get(url, params=params)
+            r.raise_for_status()
+            return r.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Audius HTTP error: {e.response.status_code}") from e
+    except (httpx.RequestError, ValueError) as e:
+        raise HTTPException(status_code=502, detail=f"Audius request failed: {e!r}") from e
+
+
+async def get_discovery_provider(force_refresh: bool = False) -> str:
+    """
+    Returns a discovery provider base URL, cached.
+    Uses api.audius.co (official) to get a list, then picks one.
+    """
+    global _DISCOVERY_PROVIDER, _DISCOVERY_PROVIDER_TS
+
+    if not force_refresh and _DISCOVERY_PROVIDER and (_now() - _DISCOVERY_PROVIDER_TS) < _DISCOVERY_TTL_SECONDS:
+        return _DISCOVERY_PROVIDER
+
+    # Try official provider list
+    try:
+        data = await _http_get_json("https://api.audius.co")
+        providers = data.get("data") or []
+        urls = [p for p in providers if isinstance(p, str) and p.startswith("http")]
+        if not urls:
+            raise ValueError("No providers returned")
+
+        _DISCOVERY_PROVIDER = random.choice(urls).rstrip("/")
+        _DISCOVERY_PROVIDER_TS = _now()
+        return _DISCOVERY_PROVIDER
+    except Exception:
+        _DISCOVERY_PROVIDER = FALLBACK_PROVIDER.rstrip("/")
+        _DISCOVERY_PROVIDER_TS = _now()
+        return _DISCOVERY_PROVIDER
+
+
+def _normalize_text(s: str) -> str:
+    s = (s or "").lower()
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _tokenize(s: str) -> Set[str]:
+    s = _normalize_text(s)
+    tokens = re.findall(r"[a-z0-9]+", s)
+    return set(tokens)
+
+
+def build_audius_queries(keywords: Sequence[str], max_queries: int = 6) -> List[str]:
+    """
+    Takes weather→mood keywords and turns them into search queries.
+    Keep it predictable for demos.
+    """
+    clean: List[str] = []
+    seen: Set[str] = set()
+
+    for k in keywords:
+        k = _normalize_text(str(k))
+        if not k or k in seen:
+            continue
+        seen.add(k)
+        clean.append(k)
+
+    if not clean:
         return ["chill"]
 
-    queries: List[str] = []
+    queries = list(clean[:max_queries])
 
-    top = kws[:4]
-    # 2-word combos first (more targeted)
-    for i in range(len(top)):
-        for j in range(i + 1, len(top)):
-            q = f"{top[i]} {top[j]}"
-            if q not in queries:
-                queries.append(q)
-
-    # Then single keywords
-    for k in kws:
-        if k not in queries:
-            queries.append(k)
+    if len(clean) >= 2 and len(queries) < max_queries:
+        queries.append(f"{clean[0]} {clean[1]}")
+    if len(clean) >= 3 and len(queries) < max_queries:
+        queries.append(f"{clean[0]} {clean[2]}")
 
     return queries[:max_queries]
 
 
-def _playlist_text(p: Dict[str, Any]) -> Tuple[str, str]:
-    name = _norm_text(p.get("playlist_name") or p.get("name") or "")
-    desc = _norm_text(p.get("description") or "")
-    return name, desc
-
-
-def score_playlist_for_keywords(p: Dict[str, Any], keywords: List[str]) -> float:
+async def get_audius_playlists(query: str, limit: int = 15) -> List[Dict[str, Any]]:
     """
-    Point-based ranking for Audius playlists:
-      - strong weight for title keyword hits
-      - moderate weight for description hits
-      - small bonuses for artwork (UI quality)
-      - tiny randomness to avoid identical results every time
+    Search for playlists by keyword query.
     """
-    name, desc = _playlist_text(p)
-    kws = [_norm_text(k) for k in (keywords or []) if _norm_text(k)]
+    provider = await get_discovery_provider()
+    url = f"{provider}/v1/playlists/search"
 
-    score = 0.0
+    data = await _http_get_json(
+        url,
+        params={"query": query, "limit": int(limit), "app_name": APP_NAME},
+    )
+    items = data.get("data") or []
+    return [x for x in items if isinstance(x, dict)]
 
-    # Text relevance
-    for k in kws:
-        if k in name:
-            score += 3.0
-        if k in desc:
-            score += 1.5
 
-    # Light quality signals
-    artwork = (p.get("artwork") or {}).get("150x150") or (p.get("artwork") or {}).get("480x480")
-    if artwork:
-        score += 0.5
+async def get_audius_playlist_tracks(playlist_id: str, limit: int = 25) -> List[Dict[str, Any]]:
+    """
+    Fetch playlist tracks. Returns track objects (including track id).
+    """
+    provider = await get_discovery_provider()
+    url = f"{provider}/v1/playlists/{playlist_id}/tracks"
 
-    # Mild penalty for empty description (often low-effort results)
-    if not desc:
-        score -= 0.25
+    data = await _http_get_json(url, params={"limit": int(limit), "app_name": APP_NAME})
+    items = data.get("data") or []
+    return [x for x in items if isinstance(x, dict)]
 
-    # Tiny randomness for variety
-    score += _rng.random() * 0.15
+
+def _pick_artwork_url(obj: Dict[str, Any]) -> Optional[str]:
+    art = obj.get("artwork")
+    if isinstance(art, str):
+        return art
+
+    if isinstance(art, dict):
+        for key in ("1000x1000", "480x480", "150x150"):
+            val = art.get(key)
+            if isinstance(val, str) and val:
+                return val
+        for val in art.values():
+            if isinstance(val, str) and val:
+                return val
+    return None
+
+
+def _track_stream_url(provider: str, track_id: str) -> str:
+    return f"{provider}/v1/tracks/{track_id}/stream?app_name={APP_NAME}"
+
+
+def to_track_payload(track: Dict[str, Any], provider: str) -> Dict[str, Any]:
+    tid = track.get("id")
+    title = track.get("title") or "Unknown track"
+
+    user = track.get("user") or {}
+    artist = user.get("name") if isinstance(user, dict) else None
+
+    payload: Dict[str, Any] = {
+        "id": str(tid) if tid is not None else "",
+        "title": str(title),
+        "artist": str(artist) if artist else "Unknown artist",
+        "artwork": _pick_artwork_url(track),
+        "duration": track.get("duration"),
+    }
+
+    if tid is not None:
+        payload["stream_url"] = _track_stream_url(provider.rstrip("/"), str(tid))
+
+    return payload
+
+
+def to_playlist_payload(playlist: Dict[str, Any]) -> Dict[str, Any]:
+    pid = playlist.get("id")
+    name = playlist.get("playlist_name") or playlist.get("name") or "Unknown playlist"
+    desc = playlist.get("description") or ""
+
+    url = playlist.get("permalink")
+    if not url and pid is not None:
+        url = f"https://audius.co/playlist/{pid}"
+
+    return {
+        "id": str(pid) if pid is not None else "",
+        "name": str(name),
+        "description": str(desc),
+        "url": str(url) if url else "",
+        "artwork": _pick_artwork_url(playlist),
+    }
+
+
+def pick_random_playlist(playlists: Sequence[Dict[str, Any]], exclude_ids: Optional[Set[str]] = None) -> Optional[Dict[str, Any]]:
+    if not playlists:
+        return None
+
+    exclude_ids = exclude_ids or set()
+    candidates: List[Dict[str, Any]] = []
+
+    for p in playlists:
+        pid = p.get("id")
+        if pid is None:
+            continue
+        if str(pid) in exclude_ids:
+            continue
+        candidates.append(p)
+
+    return random.choice(candidates) if candidates else None
+
+
+def _score_playlist(p: Dict[str, Any], keyword_tokens: Set[str]) -> float:
+    name = p.get("playlist_name") or p.get("name") or ""
+    desc = p.get("description") or ""
+
+    text_tokens = _tokenize(f"{name} {desc}")
+
+    matches = len(keyword_tokens.intersection(text_tokens))
+    score = matches * 10.0
+
+    followers = p.get("total_followers") or p.get("follow_count") or 0
+    try:
+        score += min(float(followers) / 1000.0, 5.0)
+    except Exception:
+        pass
+
     return score
 
 
 def pick_best_playlist(
-    playlists: List[Dict[str, Any]],
-    keywords: List[str],
-    exclude_ids: Optional[Set[str]] = None
+    playlists: Sequence[Dict[str, Any]],
+    keywords: Sequence[str],
+    exclude_ids: Optional[Set[str]] = None,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Pick the best matching playlist based on a point score.
-    Optionally exclude playlist IDs (e.g. last recommended).
-    """
-    exclude_ids = exclude_ids or set()
-
-    candidates: List[Tuple[float, Dict[str, Any]]] = []
-    for p in playlists or []:
-        pid = str(p.get("id") or "")
-        if not pid or pid in exclude_ids:
-            continue
-        candidates.append((score_playlist_for_keywords(p, keywords), p))
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda t: t[0], reverse=True)
-    return candidates[0][1]
-
-#Test funktion för API:t
-@router.get("/music/test")
-async def audius_test():
-    """Dev-test: bekräftar att Audius funkar och visar ett exempelobjekt."""
-
-    api_key = os.getenv("AUDIUS_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="AUDIUS_API_KEY saknas")
-
-    url = "https://api.audius.co/v1/playlists/search"
-    params = {"query": "happy", "limit": 1, "api_key": api_key}
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(url, params=params)
-
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Audius error: {r.text}")
-
-    data = r.json()
-    return {
-        "ok": True,
-        "count": len(data.get("data", [])),
-        "first": (data.get("data") or [None])[0],
-    }
-
-async def get_audius_playlists(mood_query: str, limit: int = 15):
-    """
-        Hämtar flera spellistor från Audius.
-        Filtrerar så att mood-ordet matchar playlist-namn eller beskrivning
-        användarnamn).
-        """
-    # säkerställ att vi har API-nyckel
-    api_key = os.getenv("AUDIUS_API_KEY")
-    if not api_key:
-        return []
-
-    # förbered anrop till Audius
-    params = {
-        "query": mood_query,
-        "limit": limit,
-        "api_key": api_key
-    }
-
-    # Fråga Audius, med tidsgräns
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.get(AUDIUS_API_URL, params=params)
-    except httpx.RequestError:
-        #nätverksfel, audius nere eller liknande
-        return []
-
-    # Kontrollera att audius svarade
-    if r.status_code != 200:
-        return []
-
-    # plocka ut första spellistan om det finns någon
-    playlists = r.json().get("data", []) or []
     if not playlists:
-        return []
-
-    # Light filtering: keep all results, but prefer the ones that mention the query.
-    # We do ranking later, so we should not throw away too much here.
-    q = mood_query.lower().strip()
-    if not q:
-        return playlists
-
-    preferred = []
-    others = []
-    for p in playlists:
-        name = (p.get("playlist_name") or "").lower()
-        description = (p.get("description") or "").lower()
-        if q in name or q in description:
-            preferred.append(p)
-        else:
-            others.append(p)
-
-    return preferred + others
-
-def pick_random_playlist(playlists: list, exclude_ids: Optional[Set[str]] = None):
-    """Väljer en slumpad playlist, och kan undvika vissa ID:n (t.ex. senaste)."""
+        return None
 
     exclude_ids = exclude_ids or set()
 
-    candidates = [p for p in playlists if str(p.get("id")) not in exclude_ids]
-    if not candidates:
+    keyword_tokens: Set[str] = set()
+    for k in keywords:
+        keyword_tokens |= _tokenize(str(k))
+
+    ranked: List[Tuple[float, Dict[str, Any]]] = []
+    for p in playlists:
+        pid = p.get("id")
+        if pid is None:
+            continue
+        if str(pid) in exclude_ids:
+            continue
+        ranked.append((_score_playlist(p, keyword_tokens), p))
+
+    if not ranked:
         return None
 
-    return _rng.choice(candidates)
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return ranked[0][1]
 
-def to_playlist_payload(p: Optional[Dict[str, Any]]):
-    """definierar liten payload till frontenden"""
-    if not p:
-        return None
 
-    playlist_id = p.get("id")
+# ---------------------------
+# API endpoint for frontend playback (no iframe)
+# ---------------------------
 
-    return {
-        "id": playlist_id,
-        "name": p.get("playlist_name") or p.get("name"),
-        "description": p.get("description") or "",
-        "url": f"https://audius.co/playlists/{playlist_id}",
-        "artwork": (p.get("artwork") or {}).get("150x150"),
-    }
+@router.get("/playlist/{playlist_id}/tracks")
+async def playlist_tracks(playlist_id: str, limit: int = 25):
+    """
+    Returns tracks + stream URLs so the frontend can play without iframe embeds.
+    """
+    provider = await get_discovery_provider()
+    tracks = await get_audius_playlist_tracks(playlist_id, limit=limit)
+    payload = [to_track_payload(t, provider) for t in tracks]
+    return {"playlist_id": playlist_id, "tracks": payload}
