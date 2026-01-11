@@ -92,7 +92,7 @@ async def regenerate(recommendation_id: str):
         raise HTTPException(status_code=404, detail="Recommendation id not found")
 
     """ Felhantering om ingen querry hittas"""
-    
+
     mood_query = state["mood_query"]
     last_id = state.get("last_playlist_id")
 
