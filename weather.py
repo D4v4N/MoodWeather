@@ -133,12 +133,19 @@ def compute_music_profile(weather_json: Dict[str, Any]) -> Dict[str, Any]:
     def cap(v: int) -> int:
         return int(max(0, min(100, v)))
 
+    # A simple "how positive does it feel" signal.
+    # Brightness and comfort tend to push it up; intensity and night pull it down.
+    raw_valence = (0.55 * brightness) + (0.25 * energy) + (0.20 * comfort * 100) - (0.35 * intensity)
+    if is_night:
+        raw_valence -= 8
+
     scores = {
         "energy": cap(energy),
         "brightness": cap(brightness),
         "cozy": cap(cozy),
         "intensity": cap(intensity),
         "focus": cap(focus),
+        "valence": cap(int(round(raw_valence))),
     }
 
     # Bucket: stable label that later drives Audius queries (it supposed to! hopefully it works HAHAHA)
@@ -152,7 +159,8 @@ def compute_music_profile(weather_json: Dict[str, Any]) -> Dict[str, Any]:
 
     keyword_map = {
         "energy": ["upbeat", "dance", "workout", "house", "pop"],
-        "brightness": ["happy", "feel good", "sunny", "summer", "vibes"],
+        # Keep "summer" out of the default brightness keywords; we add it conditionally based on temperature + daylight.
+        "brightness": ["happy", "feel good", "sunny", "uplifting", "bright"],
         "cozy": ["cozy", "lofi", "acoustic", "coffeehouse", "warm"],
         "intensity": ["cinematic", "dark", "intense", "dramatic", "bass"],
         "focus": ["focus", "study", "ambient", "instrumental", "chill"],
@@ -172,6 +180,29 @@ def compute_music_profile(weather_json: Dict[str, Any]) -> Dict[str, Any]:
         # de-dupy duggy doyy heeeee haaaa while preserving order
         seen = set()
         keywords = [k for k in keywords if not (k in seen or seen.add(k))]
+
+    # --- Context-aware keyword tuning ---
+    # Prevent mismatches like "summer vibes" in freezing/dark weather.
+    cold = feels_like <= 8.0
+    warm = feels_like >= 22.0
+
+    if cold:
+        keywords.extend(["winter", "cold", "cozy"])
+    elif warm and (not is_night) and cloud_n < 0.5:
+        keywords.extend(["summer", "sunshine"])
+
+    if is_night:
+        keywords.extend(["night", "late night"])
+
+    if cloud_n >= 0.8:
+        keywords.extend(["overcast", "moody"])
+
+    if "rain" in main or "drizzle" in main or "rain" in desc:
+        keywords.extend(["rainy day", "lofi beats"])
+
+    # de-dupe while preserving order
+    seen = set()
+    keywords = [k for k in keywords if not (k in seen or seen.add(k))]
 
     return {"scores": scores, "bucket": bucket, "keywords": keywords}
 
@@ -237,12 +268,10 @@ async def get_weather(city_name: str):
 
     profile = compute_music_profile(data)
 
-    # Keeping a simple mood label for now (frontend can keep using mood),
-    # but we also return the richer profile for (Audius).
-    bucket = profile["bucket"]
-    if bucket.startswith("energy") or bucket.startswith("brightness"):
+    valence = int((profile.get("scores") or {}).get("valence", 50))
+    if valence >= 60:
         mood = "happy"
-    elif bucket.startswith("storm") or bucket.startswith("intensity"):
+    elif valence <= 40:
         mood = "sad"
     else:
         mood = "neutral"
