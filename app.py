@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import httpx
 
 # Load .env BEFORE other imports (try a few likely locations)
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,6 +54,138 @@ templates = Jinja2Templates(directory="templates")
 
 #In-memory state för att kunna slumpa fram ny speliista utan ny vädersäkning
 recommendation_state = {}
+
+class _WeatherFromCoords:
+    def __init__(self, city: str, description: str, temperature: float, mood: str, bucket: str, keywords: list[str]):
+        self.city = city
+        self.description = description
+        self.temperature = temperature
+        self.mood = mood
+        self.bucket = bucket
+        self.keywords = keywords
+
+
+@app.get("/api/recommend/coords")
+async def recommend_coords(lat: float, lon: float):
+    """Recommend using browser geolocation (lat/lon)."""
+
+    key = (os.getenv("OPENWEATHER_API_KEY") or "").strip()
+    if not key:
+        raise HTTPException(status_code=500, detail="OPENWEATHER_API_KEY is missing (env not loaded)")
+
+    # 1) Fetch weather directly by coordinates
+    try:
+        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            r = await client.get(
+                "https://api.openweathermap.org/data/2.5/weather",
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "appid": key,
+                    "units": "metric",
+                    "lang": "en",
+                },
+            )
+            r.raise_for_status()
+            payload = r.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Weather API error: {e.response.status_code}") from e
+    except (httpx.RequestError, ValueError) as e:
+        raise HTTPException(status_code=502, detail=f"Weather request failed: {e!r}") from e
+
+    # 2) Compute mood/keywords using the same algorithm as weather.py
+    try:
+        profile = compute_music_profile(payload)
+        scores = profile.get("scores") or {}
+        bucket = profile.get("bucket") or "neutral"
+        keywords = profile.get("keywords") or []
+
+        # Map mood from valence (fallback safely if missing)
+        valence = int(scores.get("valence", 50))
+        if valence >= 60:
+            mood = "happy"
+        elif valence <= 40:
+            mood = "sad"
+        else:
+            mood = "neutral"
+
+        city = payload.get("name") or "Your location"
+        w0 = (payload.get("weather") or [{}])[0]
+        description = w0.get("description") or w0.get("main") or "weather"
+        temperature = float((payload.get("main") or {}).get("temp", 0.0))
+
+        weather_info = _WeatherFromCoords(
+            city=str(city),
+            description=str(description),
+            temperature=temperature,
+            mood=mood,
+            bucket=str(bucket),
+            keywords=list(keywords),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather profiling failed: {e!r}") from e
+
+    # 3) Same playlist selection logic as /api/recommend
+    try:
+        keywords = weather_info.keywords or []
+
+        if not keywords:
+            mood_map = {
+                "happy": ["sunny", "upbeat", "dance"],
+                "sad": ["lofi", "rain", "chill"],
+                "neutral": ["ambient", "peaceful", "instrumental"],
+            }
+            keywords = mood_map.get(weather_info.mood, ["chill"])
+
+        queries = build_audius_queries(keywords, max_queries=6)
+
+        all_playlists = []
+        dedup = set()
+
+        for q in queries:
+            items = await get_audius_playlists(q, limit=15)
+            for p in items:
+                pid = p.get("id")
+                if pid and pid not in dedup:
+                    dedup.add(pid)
+                    all_playlists.append(p)
+
+        playlist = pick_best_playlist(all_playlists, keywords)
+        if not playlist:
+            mood_query = queries[0] if queries else "chill"
+            fallback = await get_audius_playlists(mood_query, limit=15)
+            playlist = pick_random_playlist(fallback)
+
+        if not playlist:
+            raise HTTPException(status_code=404, detail="No playlist could be selected")
+
+        mood_query = queries[0] if queries else "chill"
+        playlist_payload = to_playlist_payload(playlist)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audius selection failed: {e!r}")
+
+    rec_id = str(uuid4())
+    recommendation_state[rec_id] = {
+        "mood_query": mood_query,
+        "keywords": keywords,
+        "last_playlist_id": str(playlist.get("id")),
+    }
+
+    return {
+        "location": weather_info.city,
+        "weather": {
+            "description": weather_info.description,
+            "temperature": weather_info.temperature,
+            "mood_key": weather_info.mood,
+        },
+        "mood_query": mood_query,
+        "bucket": weather_info.bucket,
+        "keywords": keywords,
+        "playlist": playlist_payload,
+        "recommendation_id": rec_id,
+    }
 
 @app.get("/api/recommend")
 async def recommend(location: str):
@@ -204,11 +337,21 @@ async def debug_env():
         "openweather_key_last4": key[-4:] if len(key) >= 4 else "",
     }
 
+
 # Serve frontend
 @app.get("/")
 async def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
+        {"request": request}
+    )
+
+
+# Serve API docs page
+@app.get("/api")
+async def api_docs_page(request: Request):
+    return templates.TemplateResponse(
+        "api.html",
         {"request": request}
     )
 

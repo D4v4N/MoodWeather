@@ -31,6 +31,7 @@ const form = document.getElementById("location-form");
 const input = document.getElementById("location-input");
 const statusMessage = document.getElementById("status-message");
 const resultSection = document.getElementById("result-section");
+const useLocationBtn = document.getElementById("use-location-btn");
 
 const resultLocation = document.getElementById("result-location");
 const resultMood = document.getElementById("result-mood");
@@ -271,15 +272,7 @@ function resetResultsUI() {
   }
 }
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const city = input.value.trim();
-  if (!city) {
-    setStatus("Please enter a city.", true);
-    return;
-  }
-
+function beginNewRequest() {
   // Cancel any in-flight request (rapid re-search / double click)
   if (currentAbortController) {
     currentAbortController.abort();
@@ -289,13 +282,64 @@ form.addEventListener("submit", async (e) => {
   // Reset UI so the previous playlist doesn't linger
   resetResultsUI();
 
-  setStatus("Fetching weather...");
   resultSection.classList.add("hidden");
+  return currentAbortController.signal;
+}
+
+async function renderRecommendation(data) {
+  if (!data || !data.weather || !data.playlist) {
+    throw new Error("Unexpected API response");
+  }
+
+  recommendationId = data.recommendation_id || data.recommendationId || null;
+  if (data.error) throw new Error(data.error);
+
+  if (resultLocation) resultLocation.textContent = data.location;
+  if (weatherDescription) weatherDescription.textContent = data.weather.description;
+  if (weatherTemp) weatherTemp.textContent = `${Math.round(data.weather.temperature)} °C`;
+
+  const moodKey = (data.weather.mood_key || data.weather.mood || "").toString();
+  if (resultMood) resultMood.textContent = moodKey ? moodKey.toUpperCase() : "—";
+
+  if (playlistName) playlistName.textContent = data.playlist.name;
+
+  const desc = data.playlist.description || "No description available";
+  if (playlistDescription) {
+    playlistDescription.textContent = desc.length > 100 ? desc.substring(0, 97) + "..." : desc;
+  }
+
+  if (playlistLink) {
+    playlistLink.href = data.playlist.url;
+    playlistLink.textContent = "Listen on Audius";
+  }
+
+  if (playlistCover && data.playlist.artwork) {
+    playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
+  }
+
+  // Dynamic weather icon
+  const icon = pickLucideIcon(data.weather.description, data.weather.mood_key);
+  setWeatherIcons(icon);
+
+  await loadPlaylistTracks(data.playlist);
+
+  setStatus("");
+  resultSection.classList.remove("hidden");
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const city = input.value.trim();
+
+  const signal = beginNewRequest();
+
+  setStatus("Fetching weather...");
 
   try {
     const response = await fetch(
       `/api/recommend?location=${encodeURIComponent(city)}`,
-      { cache: "no-store", signal: currentAbortController.signal }
+      { cache: "no-store", signal }
     );
 
     let data = null;
@@ -312,43 +356,7 @@ form.addEventListener("submit", async (e) => {
       throw new Error(msg);
     }
 
-    if (!data || !data.weather || !data.playlist) {
-      throw new Error("Unexpected API response");
-    }
-
-    recommendationId = data.recommendation_id || data.recommendationId || null;
-
-    if (data.error) throw new Error(data.error);
-
-    if (resultLocation) resultLocation.textContent = data.location;
-    if (weatherDescription) weatherDescription.textContent = data.weather.description;
-    if (weatherTemp) weatherTemp.textContent = `${Math.round(data.weather.temperature)} °C`;
-
-    const moodKey = (data.weather.mood_key || data.weather.mood || "").toString();
-    if (resultMood) resultMood.textContent = moodKey ? moodKey.toUpperCase() : "—";
-
-    if (playlistName) playlistName.textContent = data.playlist.name;
-
-    const desc = data.playlist.description || "No description available";
-    if (playlistDescription) playlistDescription.textContent = desc.length > 100 ? desc.substring(0, 97) + "..." : desc;
-
-    if (playlistLink) {
-      playlistLink.href = data.playlist.url;
-      playlistLink.textContent = "Listen on Audius";
-    }
-
-    if (playlistCover && data.playlist.artwork) {
-      playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
-    }
-
-    // Dynamisk väder-ikon
-    const icon = pickLucideIcon(data.weather.description, data.weather.mood_key);
-    setWeatherIcons(icon);
-
-    await loadPlaylistTracks(data.playlist);
-
-    setStatus("");
-    resultSection.classList.remove("hidden");
+    await renderRecommendation(data);
   } catch (err) {
     if (err && err.name === "AbortError") return;
     console.error(err);
@@ -408,8 +416,65 @@ if (shuffleBtn) {
     setStatus(err?.message || "Couldn't randomize new playlist", true);
    }
   });
- }
+}
 
+if (useLocationBtn) {
+  useLocationBtn.addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      setStatus("Geolocation is not supported by this browser.", true);
+      return;
+    }
+
+    const signal = beginNewRequest();
+    setStatus("Detecting your location...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+
+          setStatus("Fetching weather...");
+
+          const response = await fetch(
+            `/api/recommend/coords?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
+            { cache: "no-store", signal }
+          );
+
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (_) {}
+
+          if (!response.ok) {
+            const msg = (data && (data.detail || data.error))
+              ? (data.detail || data.error)
+              : `Request failed (${response.status})`;
+            throw new Error(msg);
+          }
+
+          await renderRecommendation(data);
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+          console.error(err);
+          setStatus(err?.message || "Could not fetch weather data.", true);
+        }
+      },
+      (geoErr) => {
+        // User denied permission or location failed
+        const msg = geoErr && geoErr.code === 1
+          ? "Location permission denied. You can type a city instead."
+          : "Could not detect location. Try typing a city.";
+        setStatus(msg, true);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 60_000,
+      }
+    );
+  });
+}
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;

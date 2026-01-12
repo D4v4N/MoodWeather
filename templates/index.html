@@ -5,6 +5,7 @@
   <title>MoodWeather – Weather Based Playlists</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="documentation" href="/api" title="MoodWeather API Documentation" />
 </head>
 <body>
   <div class="page-bg"></div>
@@ -20,9 +21,9 @@
         <div class="logo-text">MoodWeather</div>
       </div>
       <nav class="nav-links">
-        <a href="#" class="nav-link active">Home</a>
-        <a href="#" class="nav-link">About Project</a>
-        <a href="#" class="nav-link">API Docs</a>
+        <a href="/" class="nav-link active">Home</a>
+        <a href="/#about" class="nav-link">About Project</a>
+        <a href="/api" class="nav-link" rel="documentation">API Docs</a>
       </nav>
     </header>
 
@@ -41,7 +42,11 @@
           <button type="submit" class="primary-btn">
             Get Mood
           </button>
+          <button type="button" id="use-location-btn" class="secondary-btn">
+            Use my location
+          </button>
         </form>
+        <p class="helper-text">Tip: You can either type a city or let the browser detect your location.</p>
         <p id="status-message" class="status-message"></p>
       </section>
 
@@ -126,6 +131,6 @@
   </div>
 
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="../static/app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>
