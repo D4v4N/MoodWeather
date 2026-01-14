@@ -1,0 +1,149 @@
+/* API Docs page: clean readability while keeping the "glass" look */
+
+.page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 26px 26px 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: 0.2px;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Reusing our button style, but ensure it looks good here too */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: var(--glass-border);
+  background: rgba(10, 18, 36, 0.45);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.pill:hover {
+  filter: brightness(1.08);
+}
+
+.card {
+  padding: 18px 18px 16px;
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
+
+.card p,
+.card li {
+  line-height: 1.7;
+}
+
+.muted {
+  opacity: 0.86;
+}
+
+.card ul,
+.card ol {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.card li {
+  margin: 6px 0;
+}
+
+.card a {
+  color: var(--accent-blue);
+  text-underline-offset: 3px;
+}
+
+.card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  padding: 0.15em 0.35em;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Endpoint blocks */
+.endpoint {
+  margin-top: 12px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(10, 18, 36, 0.28);
+}
+
+.sig {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.method {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  color: #d6ecff;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  font-size: 12px;
+}
+
+.path {
+  opacity: 0.95;
+  font-weight: 600;
+}
+
+.code {
+  margin: 10px 0 0;
+  padding: 14px;
+  border-radius: 16px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .page {
+    padding: 18px 16px 10px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
