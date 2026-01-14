@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>API-handbok — MoodWeather</title>
+  <title>API Handbook — MoodWeather</title>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="stylesheet" href="/static/api.css" />
 </head>
@@ -27,71 +27,71 @@
     <main class="glass-main">
       <div class="page">
         <header class="topbar">
-          <h1>MoodWeather – API-handbok</h1>
+          <h1>MoodWeather — API Handbook</h1>
           <nav class="links" aria-label="Documentation links">
-            <a href="/" class="pill">← Tillbaka</a>
+            <a href="/" class="pill">← Back</a>
             <a href="/docs" class="pill">Swagger</a>
             <a href="/openapi.json" class="pill">OpenAPI</a>
           </nav>
         </header>
 
         <section class="card">
-          <h2>Översikt</h2>
+          <h2>Overview</h2>
           <p class="muted">
-            MoodWeather är en webbtjänst som rekommenderar musik baserat på väderförhållanden.
-            Systemet består av en frontend (webbklient) och ett backend-API byggt med FastAPI.
+            MoodWeather is a web service that recommends music based on current weather conditions.
+            The system consists of a frontend (web client) and a backend API built with FastAPI.
           </p>
           <p class="muted">
-            Frontend kommunicerar endast med vårt eget API. All logik för vädertolkning,
-            mood-analys och musikval sker på serversidan.
+            The frontend talks only to our own API. All logic for weather interpretation,
+            mood analysis, and music selection happens on the server.
           </p>
         </section>
 
         <section class="card">
-          <h2>Vad räknas som API i detta projekt?</h2>
+          <h2>What counts as an API in this project?</h2>
           <ul class="muted">
-            <li><strong>Vårt API (Backend):</strong> FastAPI-endpoints under <code>/api/</code></li>
-            <li><strong>Externa API:er:</strong> OpenWeather (väderdata) och Audius (musik)</li>
+            <li><strong>Our API (Backend):</strong> FastAPI endpoints under <code>/api/</code></li>
+            <li><strong>External APIs:</strong> OpenWeather (weather data) and Audius (music)</li>
             <li><strong>Browser API:</strong> Geolocation via <code>navigator.geolocation</code></li>
           </ul>
           <p class="muted">
-            Platsdetektering sker i webbläsaren, men koordinater skickas vidare till vårt backend-API
-            som i sin tur hämtar väderdata och genererar rekommendationen.
+            Location detection happens in the browser, but coordinates are sent to our backend API,
+            which then fetches weather data and generates the recommendation.
           </p>
         </section>
 
         <section class="card">
-          <h2>API-design – tanke och arkitektur</h2>
+          <h2>API design — thinking and architecture</h2>
           <ul class="muted">
-            <li>Frontend ska vara enkel och inte innehålla affärslogik</li>
-            <li>Alla API-nycklar hålls på serversidan (.env)</li>
-            <li>Samma svarformat används oavsett om plats anges manuellt eller automatiskt</li>
-            <li>Rekommendationer ska vara förklarbara (weather → mood → keywords)</li>
+            <li>The frontend should stay simple and not contain business logic</li>
+            <li>All API keys are stored server-side (<code>.env</code>)</li>
+            <li>We return the same response format whether location is manual or automatic</li>
+            <li>Recommendations should be explainable (<code>weather → mood → keywords</code>)</li>
           </ul>
         </section>
 
         <section class="card">
-          <h2>Hur rekommendationen fungerar</h2>
+          <h2>How the recommendation works</h2>
           <ol class="muted">
-            <li>Användaren anger plats (stad eller geolocation)</li>
-            <li>Backend hämtar aktuellt väder från OpenWeather</li>
-            <li>Väderdata analyseras (temperatur, molnighet, dag/natt, vind, nederbörd)</li>
-            <li>En musikprofil beräknas (energy och valence)</li>
-            <li>Profilen översätts till keywords</li>
-            <li>Backend söker spellistor via Audius API</li>
-            <li>Den bäst matchande spellistan returneras till frontend</li>
+            <li>The user provides a location (city or geolocation)</li>
+            <li>The backend fetches current weather from OpenWeather</li>
+            <li>Weather is analyzed (temperature, clouds, day/night, wind, precipitation)</li>
+            <li>A music profile is calculated (e.g. energy and valence)</li>
+            <li>The profile is translated into keywords</li>
+            <li>The backend searches playlists via the Audius API</li>
+            <li>The best matching playlist is returned to the frontend</li>
           </ol>
         </section>
 
         <section class="card">
-          <h2>Endpoints – vårt API</h2>
+          <h2>Endpoints — our API</h2>
 
           <div class="endpoint">
             <div class="sig">
               <span class="method">GET</span>
               <span class="path">/api/recommend?location=&lt;city&gt;</span>
             </div>
-            <p class="muted">Används när användaren manuellt anger en stad.</p>
+            <p class="muted">Use this when the user manually enters a city.</p>
             <pre class="code">/api/recommend?location=London</pre>
           </div>
 
@@ -100,7 +100,7 @@
               <span class="method">GET</span>
               <span class="path">/api/recommend/coords?lat=&lt;float&gt;&amp;lon=&lt;float&gt;</span>
             </div>
-            <p class="muted">Används tillsammans med webbläsarens platsdetektering.</p>
+            <p class="muted">Use this together with browser location detection.</p>
             <pre class="code">/api/recommend/coords?lat=55.6053&lon=13.0002</pre>
           </div>
 
@@ -109,25 +109,24 @@
               <span class="method">GET</span>
               <span class="path">/api/music/playlist/{playlist_id}/tracks</span>
             </div>
-            <p class="muted">Returnerar tracks och stream-URL för uppspelning via HTML5 audio.</p>
+            <p class="muted">Returns tracks + stream URL for HTML5 audio playback.</p>
           </div>
         </section>
 
         <section class="card">
-          <h2>Felhantering</h2>
+          <h2>Error handling</h2>
           <ul class="muted">
-            <li><strong>200 OK</strong> – lyckad begäran</li>
-            <li><strong>404</strong> – plats eller spellista hittades inte</li>
-            <li><strong>500</strong> – serverkonfiguration saknas (t.ex. API-nyckel)</li>
-            <li><strong>502</strong> – externt API svarar inte korrekt</li>
+            <li><strong>200 OK</strong> — success</li>
+            <li><strong>404</strong> — location or playlist not found</li>
+            <li><strong>500</strong> — server misconfiguration (e.g. missing API key)</li>
+            <li><strong>502</strong> — external API failure / invalid response</li>
           </ul>
         </section>
 
         <section class="card">
-          <h2>Interaktiv API-dokumentation</h2>
+          <h2>Interactive API documentation</h2>
           <p class="muted">
-            För detaljerad och uppdaterad dokumentation av alla endpoints används FastAPI:s
-            automatiskt genererade Swagger-gränssnitt.
+            For detailed and always up-to-date documentation, we use FastAPI’s automatically generated Swagger UI.
           </p>
           <ul class="muted">
             <li><a href="/docs">/docs (Swagger UI)</a></li>
