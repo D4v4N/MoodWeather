@@ -72,21 +72,6 @@ function stopEmbeddedPlayback() {
   if (playlistBody) playlistBody.innerHTML = "";
 }
 
-function getAudiusPlaylistId(playlist) {
-  if (!playlist) return "";
-
-  const explicitId = playlist.id || playlist.playlist_id || playlist.playlistId;
-  if (explicitId) return String(explicitId);
-
-  const rawUrl = playlist.url ? String(playlist.url) : "";
-  if (!rawUrl) return "";
-
-  let url = rawUrl;
-  if (url.endsWith("/")) url = url.slice(0, -1);
-  const parts = url.split("/");
-  return parts[parts.length - 1] || "";
-}
-
 function renderNativePlayer(tracks) {
   const playlistBody = document.querySelector(".playlist-body");
   if (!playlistBody) return;
@@ -216,36 +201,6 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-async function loadPlaylistTracks(playlist) {
-  const playlistId = getAudiusPlaylistId(playlist);
-  if (!playlistId) {
-    console.warn("No playlist id available.", playlist);
-    return;
-  }
-
-  const playlistBody = document.querySelector(".playlist-body");
-  if (playlistBody) {
-    playlistBody.innerHTML = "<p style='opacity:.85'>Loading tracks…</p>";
-  }
-
-  const res = await fetch(`/api/music/playlist/${encodeURIComponent(playlistId)}/tracks?limit=25`, {
-    cache: "no-store",
-  });
-
-  let data = null;
-  try {
-    data = await res.json();
-  } catch (_) {}
-
-  if (!res.ok) {
-    const msg = (data && (data.detail || data.error)) ? (data.detail || data.error) : `Tracks request failed (${res.status})`;
-    throw new Error(msg);
-  }
-
-  const tracks = (data && data.tracks) ? data.tracks : [];
-  renderNativePlayer(tracks);
-}
-
 function resetResultsUI() {
   // Clear status and hide results until we have fresh data
   setStatus("");
@@ -287,41 +242,43 @@ function beginNewRequest() {
 }
 
 async function renderRecommendation(data) {
-  if (!data || !data.weather || !data.playlist) {
+  if (!data || !data.weather || !data.music || !data.music.playlist) {
     throw new Error("Unexpected API response");
   }
 
   recommendationId = data.recommendation_id || data.recommendationId || null;
   if (data.error) throw new Error(data.error);
 
-  if (resultLocation) resultLocation.textContent = data.location;
+  if (resultLocation) resultLocation.textContent = data.weather.location;
   if (weatherDescription) weatherDescription.textContent = data.weather.description;
   if (weatherTemp) weatherTemp.textContent = `${Math.round(data.weather.temperature)} °C`;
 
   const moodKey = (data.weather.mood_key || data.weather.mood || "").toString();
   if (resultMood) resultMood.textContent = moodKey ? moodKey.toUpperCase() : "—";
 
-  if (playlistName) playlistName.textContent = data.playlist.name;
+  if (playlistName) playlistName.textContent = data.music.playlist.name;
 
-  const desc = data.playlist.description || "No description available";
+  const desc = data.music.playlist.description || "No description available";
   if (playlistDescription) {
     playlistDescription.textContent = desc.length > 100 ? desc.substring(0, 97) + "..." : desc;
   }
 
   if (playlistLink) {
-    playlistLink.href = data.playlist.url;
+    playlistLink.href = data.music.playlist.url;
     playlistLink.textContent = "Listen on Audius";
   }
 
-  if (playlistCover && data.playlist.artwork) {
-    playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
+  if (playlistCover && data.music.playlist.artwork) {
+    playlistCover.style.backgroundImage = `url(${data.music.playlist.artwork})`;
   }
 
   // Dynamic weather icon
   const icon = pickLucideIcon(data.weather.description, data.weather.mood_key);
   setWeatherIcons(icon);
 
-  await loadPlaylistTracks(data.playlist);
+  // Use tracks from mashup response directly
+  const tracks = data.music.tracks || [];
+  renderNativePlayer(tracks);
 
   setStatus("");
   resultSection.classList.remove("hidden");
@@ -338,7 +295,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     const response = await fetch(
-      `/api/recommend?location=${encodeURIComponent(city)}`,
+      `/api/mashup?location=${encodeURIComponent(city)}`,
       { cache: "no-store", signal }
     );
 
@@ -408,7 +365,9 @@ if (shuffleBtn) {
     playlistCover.style.backgroundImage = `url(${data.playlist.artwork})`;
    }
 
-   await loadPlaylistTracks(data.playlist);
+   // Use tracks from response directly
+   const tracks = data.tracks || [];
+   renderNativePlayer(tracks);
 
     setStatus("");
   } catch (err) {
@@ -437,7 +396,7 @@ if (useLocationBtn) {
           setStatus("Fetching weather...");
 
           const response = await fetch(
-            `/api/recommend/coords?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
+            `/api/mashup/coords?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
             { cache: "no-store", signal }
           );
 
