@@ -30,7 +30,7 @@ from fastapi.templating import Jinja2Templates
 
 from weather import get_weather, router as weather_router
 from weather import compute_music_profile
-from music import get_audius_playlists, router as music_router, pick_random_playlist, to_playlist_payload, build_audius_queries, pick_best_playlist
+from music import get_audius_playlists, router as music_router, pick_random_playlist, to_playlist_payload, build_audius_queries, pick_best_playlist, get_audius_playlist_tracks, to_track_payload, get_discovery_provider
 
 app = FastAPI(title="MoodWeather")
 
@@ -55,25 +55,109 @@ templates = Jinja2Templates(directory="templates")
 #In-memory state för att kunna slumpa fram ny speliista utan ny vädersäkning
 recommendation_state = {}
 
-class _WeatherFromCoords:
-    def __init__(self, city: str, description: str, temperature: float, mood: str, bucket: str, keywords: list[str]):
-        self.city = city
-        self.description = description
-        self.temperature = temperature
-        self.mood = mood
-        self.bucket = bucket
-        self.keywords = keywords
+@app.get("/api/mashup")
+async def mashup(location: str):
+    """
+    Mashup API: Combines weather data from OpenWeather with music recommendations from Audius.
+    Returns a structured response with weather analysis and playlist selection.
+    """
+    #Fetch weather data
+    try:
+        weather_info = await get_weather(location)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    #  Build music queries from weather profile keywords
+    try:
+        keywords = weather_info.keywords or []
+
+        if not keywords:
+            mood_map = {
+                "happy": ["sunny", "upbeat", "dance"],
+                "sad": ["lofi", "rain", "chill"],
+                "neutral": ["ambient", "peaceful", "instrumental"],
+            }
+            keywords = mood_map.get(weather_info.mood, ["chill"])
+
+        queries = build_audius_queries(keywords, max_queries=6)
+
+        #  Fetch and rank playlists from Audius
+        all_playlists = []
+        dedup = set()
+
+        for q in queries:
+            items = await get_audius_playlists(q, limit=15)
+            for p in items:
+                pid = p.get("id")
+                if pid and pid not in dedup:
+                    dedup.add(pid)
+                    all_playlists.append(p)
+
+        playlist = pick_best_playlist(all_playlists, keywords)
+        if not playlist:
+            mood_query = queries[0] if queries else "chill"
+            fallback = await get_audius_playlists(mood_query, limit=15)
+            playlist = pick_random_playlist(fallback)
+
+        if not playlist:
+            raise HTTPException(status_code=404, detail="No playlist could be selected")
+
+        mood_query = queries[0] if queries else "chill"
+        playlist_payload = to_playlist_payload(playlist)
+
+        # Fetch tracks for the playlist
+        playlist_id = playlist.get("id")
+        provider = await get_discovery_provider()
+        tracks_raw = await get_audius_playlist_tracks(str(playlist_id), limit=25)
+        tracks = [to_track_payload(t, provider) for t in tracks_raw]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audius selection failed: {e!r}")
+
+    # Store state for regeneration
+    rec_id = str(uuid4())
+    recommendation_state[rec_id] = {
+        "mood_query": mood_query,
+        "keywords": keywords,
+        "last_playlist_id": str(playlist.get("id")),
+    }
+
+    # Return structured mashup response
+    return {
+        "weather": {
+            "location": weather_info.city,
+            "description": weather_info.description,
+            "temperature": weather_info.temperature,
+            "humidity": weather_info.humidity,
+            "wind_speed": weather_info.wind_speed,
+            "mood": weather_info.mood,
+            "bucket": weather_info.bucket,
+            "scores": weather_info.scores,
+        },
+        "music": {
+            "keywords": keywords,
+            "mood_query": mood_query,
+            "playlist": playlist_payload,
+            "tracks": tracks,
+        },
+        "recommendation_id": rec_id,
+    }
 
 
-@app.get("/api/recommend/coords")
-async def recommend_coords(lat: float, lon: float):
-    """Recommend using browser geolocation (lat/lon)."""
-
+@app.get("/api/mashup/coords")
+async def mashup_coords(lat: float, lon: float):
+    """
+    Mashup API (geolocation): Combines weather data from OpenWeather with music recommendations from Audius.
+    Uses browser geolocation coordinates instead of city name.
+    """
     key = (os.getenv("OPENWEATHER_API_KEY") or "").strip()
     if not key:
         raise HTTPException(status_code=500, detail="OPENWEATHER_API_KEY is missing (env not loaded)")
 
-    # 1) Fetch weather directly by coordinates
+    # Fetch weather by coordinates
     try:
         async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
             r = await client.get(
@@ -93,14 +177,13 @@ async def recommend_coords(lat: float, lon: float):
     except (httpx.RequestError, ValueError) as e:
         raise HTTPException(status_code=502, detail=f"Weather request failed: {e!r}") from e
 
-    # 2) Compute mood/keywords using the same algorithm as weather.py
+    # Compute mood profile
     try:
         profile = compute_music_profile(payload)
         scores = profile.get("scores") or {}
         bucket = profile.get("bucket") or "neutral"
         keywords = profile.get("keywords") or []
 
-        # Map mood from valence (fallback safely if missing)
         valence = int(scores.get("valence", 50))
         if valence >= 60:
             mood = "happy"
@@ -112,30 +195,23 @@ async def recommend_coords(lat: float, lon: float):
         city = payload.get("name") or "Your location"
         w0 = (payload.get("weather") or [{}])[0]
         description = w0.get("description") or w0.get("main") or "weather"
-        temperature = float((payload.get("main") or {}).get("temp", 0.0))
-
-        weather_info = _WeatherFromCoords(
-            city=str(city),
-            description=str(description),
-            temperature=temperature,
-            mood=mood,
-            bucket=str(bucket),
-            keywords=list(keywords),
-        )
+        main_data = payload.get("main") or {}
+        temperature = float(main_data.get("temp", 0.0))
+        humidity = int(main_data.get("humidity", 50))
+        wind_data = payload.get("wind") or {}
+        wind_speed = float(wind_data.get("speed", 0.0))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weather profiling failed: {e!r}") from e
 
-    # 3) Same playlist selection logic as /api/recommend
+    #  Build music queries and fetch playlists
     try:
-        keywords = weather_info.keywords or []
-
         if not keywords:
             mood_map = {
                 "happy": ["sunny", "upbeat", "dance"],
                 "sad": ["lofi", "rain", "chill"],
                 "neutral": ["ambient", "peaceful", "instrumental"],
             }
-            keywords = mood_map.get(weather_info.mood, ["chill"])
+            keywords = mood_map.get(mood, ["chill"])
 
         queries = build_audius_queries(keywords, max_queries=6)
 
@@ -161,11 +237,18 @@ async def recommend_coords(lat: float, lon: float):
 
         mood_query = queries[0] if queries else "chill"
         playlist_payload = to_playlist_payload(playlist)
+
+        # Fetch tracks for the playlist
+        playlist_id = playlist.get("id")
+        provider = await get_discovery_provider()
+        tracks_raw = await get_audius_playlist_tracks(str(playlist_id), limit=25)
+        tracks = [to_track_payload(t, provider) for t in tracks_raw]
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audius selection failed: {e!r}")
 
+    # Store state for regeneration
     rec_id = str(uuid4())
     recommendation_state[rec_id] = {
         "mood_query": mood_query,
@@ -173,96 +256,27 @@ async def recommend_coords(lat: float, lon: float):
         "last_playlist_id": str(playlist.get("id")),
     }
 
+    # Return structured mashup response
     return {
-        "location": weather_info.city,
         "weather": {
-            "description": weather_info.description,
-            "temperature": weather_info.temperature,
-            "mood_key": weather_info.mood,
+            "location": str(city),
+            "description": str(description),
+            "temperature": temperature,
+            "humidity": humidity,
+            "wind_speed": wind_speed,
+            "mood": mood,
+            "bucket": str(bucket),
+            "scores": scores,
         },
-        "mood_query": mood_query,
-        "bucket": weather_info.bucket,
-        "keywords": keywords,
-        "playlist": playlist_payload,
+        "music": {
+            "keywords": keywords,
+            "mood_query": mood_query,
+            "playlist": playlist_payload,
+            "tracks": tracks,
+        },
         "recommendation_id": rec_id,
     }
 
-@app.get("/api/recommend")
-async def recommend(location: str):
-    # hämta väder (låter FastAPI skicka rätt statuskod vid fel)
-    try:
-        weather_info = await get_weather(location)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
-        # Build Audius queries from the richer weather profile (keywords computed in weather.py)
-        keywords = weather_info.keywords or []
-
-        # Fallback if keywords aren't available for any reason
-        if not keywords:
-            mood_map = {
-                "happy": ["sunny", "upbeat", "dance"],
-                "sad": ["lofi", "rain", "chill"],
-                "neutral": ["ambient", "peaceful", "instrumental"],
-            }
-            keywords = mood_map.get(weather_info.mood, ["chill"])
-
-        queries = build_audius_queries(keywords, max_queries=6)
-
-        # Fetch playlists from multiple queries, then rank them (avoid being overly random)
-        all_playlists = []
-        dedup = set()
-
-        for q in queries:
-            items = await get_audius_playlists(q, limit=15)
-            for p in items:
-                pid = p.get("id")
-                if pid and pid not in dedup:
-                    dedup.add(pid)
-                    all_playlists.append(p)
-
-        playlist = pick_best_playlist(all_playlists, keywords)
-        if not playlist:
-            # Fallback: keep old behavior if ranking yields nothing
-            mood_query = queries[0] if queries else "chill"
-            fallback = await get_audius_playlists(mood_query, limit=15)
-            playlist = pick_random_playlist(fallback)
-
-        if not playlist:
-            raise HTTPException(status_code=404, detail="No playlist could be selected")
-
-        mood_query = queries[0] if queries else "chill"
-        playlist_payload = to_playlist_payload(playlist)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Audius selection failed: {e!r}")
-
-    #spara state för att kunna generera ny spellist
-    rec_id = str(uuid4())
-    recommendation_state[rec_id] = {
-        "mood_query": mood_query,
-        "keywords": keywords,
-        # "index":0, #för att även implementera "next"
-        "last_playlist_id": str(playlist.get("id")),
-    }
-
-    return {
-        "location": weather_info.city,
-        "weather": {
-            "description": weather_info.description,
-            "temperature": weather_info.temperature,
-            "mood_key": weather_info.mood
-        },
-        "mood_query": mood_query,
-        "bucket": getattr(weather_info, "bucket", None),
-        "keywords": keywords,
-        "playlist": playlist_payload,
-        "recommendation_id": rec_id
-    }
 
 @app.get("/api/recommend/regenerate")
 async def regenerate(recommendation_id: str):
@@ -304,6 +318,12 @@ async def regenerate(recommendation_id: str):
             raise HTTPException(status_code=404, detail="No new playlists found")
 
         state["last_playlist_id"] = str(playlist.get("id"))
+
+        # Fetch tracks for the playlist
+        playlist_id = playlist.get("id")
+        provider = await get_discovery_provider()
+        tracks_raw = await get_audius_playlist_tracks(str(playlist_id), limit=25)
+        tracks = [to_track_payload(t, provider) for t in tracks_raw]
     except HTTPException:
         raise
     except Exception as e:
@@ -311,7 +331,8 @@ async def regenerate(recommendation_id: str):
 
     return {
         "mood_query": mood_query,
-        "playlist": to_playlist_payload(playlist)
+        "playlist": to_playlist_payload(playlist),
+        "tracks": tracks,
     }
 
 @app.get("/api/debug/env")
