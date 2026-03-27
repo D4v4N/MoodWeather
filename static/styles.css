@@ -303,7 +303,7 @@ body {
   border-radius: var(--radius-lg);
   background: radial-gradient(
       circle at top left,
-      rgba(255, 255, 255, 0.14),
+      rgba(30, 64, 175, 0.5),
       transparent 55%
     ),
     var(--glass-bg);
@@ -449,6 +449,7 @@ body {
 
 .track-title {
   font-weight: 500;
+  color: #f9fafb;
 }
 
 .track-artist {
@@ -631,6 +632,7 @@ body {
   position: relative;
   overflow: hidden;
   min-height: 420px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .playlist-body iframe {
