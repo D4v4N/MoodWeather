@@ -367,6 +367,13 @@ async def home(request: Request):
         {"request": request}
     )
 
+@app.get("/pomodoro")
+async def pomodoro_page(request: Request):
+    return templates.TemplateResponse(
+        "pomodoro.html",
+        {"request": request}
+    )
+
 
 # Serve API docs page
 @app.get("/api")
