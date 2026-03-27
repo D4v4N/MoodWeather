@@ -5,18 +5,40 @@
     <title>Pomodoro</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
+
 <body>
 
-<div class="glass-main">
-    <h1>Pomodoro Timer</h1>
+<div class="pomodoro-page">
+    <div class="pomodoro-overlay"></div>
 
-    <div id="timer" style="font-size: 3rem; margin: 20px 0;">
-        25:00
+    <div class="pomodoro-topbar">
+        <div class="pomodoro-brand">
+            <span class="brand-main">flocus</span>
+            <span class="brand-sub">by MoodWeather</span>
+        </div>
+
+        <div class="pomodoro-quote">
+            “Life begins at the end of your comfort zone.”
+        </div>
     </div>
 
-    <button class="primary-btn" onclick="startTimer()">Start</button>
-    <button class="secondary-btn" onclick="pauseTimer()">Pause</button>
-    <button class="secondary-btn" onclick="resetTimer()">Reset</button>
+    <div class="pomodoro-center">
+        <h1 class="pomodoro-task">Focus session</h1>
+
+        <div class="pomodoro-modes">
+            <button class="mode-btn active">Pomodoro</button>
+            <button class="mode-btn">Short Break</button>
+            <button class="mode-btn">Long Break</button>
+        </div>
+
+        <div id="timer" class="pomodoro-timer">25:00</div>
+
+        <div class="pomodoro-controls">
+            <button class="pomodoro-main-btn" onclick="startTimer()">Start</button>
+            <button class="pomodoro-icon-btn" onclick="pauseTimer()">Pause</button>
+            <button class="pomodoro-icon-btn" onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
 </div>
 
 <script src="/static/pomodoro.js"></script>

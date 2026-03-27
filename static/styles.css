@@ -657,3 +657,236 @@ body {
   position: relative;
   z-index: 1;
 }
+
+/* =========================
+   POMODORO PAGE
+   ========================= */
+
+body {
+  margin: 0;
+}
+
+.pomodoro-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background:
+          linear-gradient(rgba(255,255,255,0.08), rgba(255,255,255,0.08)),
+          linear-gradient(135deg, rgba(110, 76, 255, 0.35), rgba(255, 152, 208, 0.28)),
+          url("https://images.unsplash.com/photo-1519904981063-b0cf448d479e?auto=format&fit=crop&w=1600&q=80")
+          center/cover no-repeat;
+}
+
+.pomodoro-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+          radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 30%),
+          radial-gradient(circle at 80% 15%, rgba(255,255,255,0.14), transparent 25%),
+          radial-gradient(circle at 50% 75%, rgba(190, 120, 255, 0.22), transparent 35%),
+          linear-gradient(to bottom, rgba(92, 56, 120, 0.18), rgba(255, 190, 220, 0.10));
+  backdrop-filter: blur(2px);
+  z-index: 0;
+}
+
+.pomodoro-topbar {
+  position: absolute;
+  top: 28px;
+  left: 40px;
+  right: 40px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pomodoro-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.95;
+}
+
+.brand-main {
+  font-size: 4rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: rgba(255,255,255,0.96);
+}
+
+.brand-sub {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+}
+
+.pomodoro-quote {
+  max-width: 360px;
+  text-align: right;
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgba(255,255,255,0.88);
+  text-shadow: 0 4px 18px rgba(0,0,0,0.12);
+}
+
+.pomodoro-center {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 80px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.pomodoro-task {
+  margin: 0 0 18px;
+  font-size: 3rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.96);
+  text-shadow: 0 8px 28px rgba(0,0,0,0.18);
+}
+
+.pomodoro-modes {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.mode-btn {
+  min-width: 150px;
+  padding: 14px 24px;
+  border-radius: 18px;
+  border: 2px solid rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.10);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.16);
+}
+
+.mode-btn.active {
+  border: none;
+  background: linear-gradient(135deg, #6d32ff, #8f4bff);
+  box-shadow: 0 12px 28px rgba(109, 50, 255, 0.35);
+}
+
+.pomodoro-timer {
+  font-size: clamp(5rem, 14vw, 10rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: rgba(255,255,255,0.98);
+  text-shadow: 0 10px 32px rgba(0,0,0,0.16);
+  margin: 10px 0 24px;
+}
+
+.pomodoro-controls {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.pomodoro-main-btn,
+.pomodoro-icon-btn {
+  border: none;
+  border-radius: 18px;
+  padding: 14px 28px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  color: #ffffff;
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pomodoro-main-btn {
+  background: linear-gradient(135deg, #6d32ff, #8f4bff);
+  box-shadow: 0 12px 28px rgba(109, 50, 255, 0.35);
+  min-width: 150px;
+}
+
+.pomodoro-main-btn:hover,
+.pomodoro-icon-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+}
+
+.pomodoro-icon-btn {
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.6);
+  min-width: 120px;
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 900px) {
+  .pomodoro-topbar {
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .pomodoro-quote {
+    text-align: left;
+    max-width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .brand-main {
+    font-size: 3rem;
+  }
+
+  .pomodoro-task {
+    font-size: 2.2rem;
+  }
+
+  .mode-btn {
+    min-width: 130px;
+    padding: 12px 18px;
+  }
+}
+
+@media (max-width: 600px) {
+  .pomodoro-center {
+    padding-top: 140px;
+  }
+
+  .pomodoro-task {
+    font-size: 1.8rem;
+  }
+
+  .pomodoro-controls {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .pomodoro-main-btn,
+  .pomodoro-icon-btn {
+    width: 100%;
+    max-width: 320px;
+  }
+}
