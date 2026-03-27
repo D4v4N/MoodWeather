@@ -19,7 +19,8 @@ function startTimer() {
         } else {
             clearInterval(timerInterval);
             timerInterval = null;
-            alert("Time's up!");
+            const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+            audio.play();
         }
     }, 1000);
 }
