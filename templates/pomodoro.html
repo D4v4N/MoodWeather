@@ -28,26 +28,28 @@
     </header>
 
     <main class="glass-main pomodoro-glass-main">
-        <div class="pomodoro-inner">
-            <div class="pomodoro-topline">
-                <div class="pomodoro-brand-block">
-                    <div class="pomodoro-mini-brand">Focus Mode</div>
+        <div class="pomodoro-page-wrapper">
+            <div class="pomodoro-inner">
+                <div class="pomodoro-topline">
+                    <div class="pomodoro-brand-block">
+                        <div class="pomodoro-mini-brand">Focus Mode</div>
+                    </div>
+
+                    <div class="pomodoro-quote-inline">
+                        “Life begins at the end of your comfort zone, keep going and never give up!”
+                    </div>
                 </div>
 
-                <div class="pomodoro-quote-inline">
-                    “Life begins at the end of your comfort zone, keep going and never give up!”
-                </div>
-            </div>
+                <div class="pomodoro-center">
+                    <h1 class="pomodoro-task">Focus session</h1>
 
-            <div class="pomodoro-center">
-                <h1 class="pomodoro-task">Focus session</h1>
+                    <div id="timer" class="pomodoro-timer">25:00</div>
 
-                <div id="timer" class="pomodoro-timer">25:00</div>
-
-                <div class="pomodoro-controls">
-                    <button class="pomodoro-main-btn" onclick="startTimer()">Start</button>
-                    <button class="pomodoro-icon-btn" onclick="pauseTimer()">Pause</button>
-                    <button class="pomodoro-icon-btn" onclick="resetTimer()">Reset</button>
+                    <div class="pomodoro-controls">
+                        <button class="pomodoro-main-btn" onclick="startTimer()">Start</button>
+                        <button class="pomodoro-icon-btn" onclick="pauseTimer()">Pause</button>
+                        <button class="pomodoro-icon-btn" onclick="resetTimer()">Reset</button>
+                    </div>
                 </div>
             </div>
         </div>
