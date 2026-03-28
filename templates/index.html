@@ -7,79 +7,87 @@
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="documentation" href="/api" title="MoodWeather API Documentation" />
 </head>
+
 <body>
-  <div class="page-bg"></div>
+<div class="page-bg"></div>
 
-  <div class="shell">
+<div class="shell">
 
-    <!-- Top glass navigation bar -->
-    <header class="glass-nav">
-      <div class="nav-left">
-        <div class="logo-icon">
-          <i id="weather-icon" data-lucide="cloud"></i>
-        </div>
-        <div class="logo-text">MoodWeather</div>
+  <!-- NAVBAR -->
+  <header class="glass-nav">
+    <div class="nav-left">
+      <div class="logo-icon">
+        <i id="weather-icon" data-lucide="cloud"></i>
       </div>
-      <nav class="nav-links">
-        <a href="/" class="nav-link active">Home</a>
-        <a href="/#about" class="nav-link">About Project</a>
-        <a href="/api" class="nav-link" rel="documentation">API Docs</a>
-        <a href="/pomodoro" class="nav-link">Pomodoro</a>
-      </nav>
-    </header>
+      <div class="logo-text">MoodWeather</div>
+    </div>
 
-    <!-- Main glass panel -->
-    <main class="glass-main">
-      <!-- Search bar row -->
+    <nav class="nav-links">
+      <a href="#" id="nav-home" class="nav-link active">Home</a>
+      <a href="/#about" class="nav-link">About Project</a>
+      <a href="/api" class="nav-link" rel="documentation">API Docs</a>
+      <a href="#" id="nav-pomodoro" class="nav-link">Pomodoro</a>
+    </nav>
+  </header>
+
+  <!-- MAIN -->
+  <main class="glass-main">
+
+    <!-- ================= HOME VIEW ================= -->
+    <div id="home-view">
+
       <section class="search-bar">
         <form id="location-form" class="search-form">
           <input
-            id="location-input"
-            type="text"
-            name="location"
-            placeholder="Enter your city to set the mood..."
-            required
+                  id="location-input"
+                  type="text"
+                  name="location"
+                  placeholder="Enter your city to set the mood..."
+                  required
           />
-          <button type="submit" class="primary-btn">
-            Get Mood
-          </button>
+          <button type="submit" class="primary-btn">Get Mood</button>
           <button type="button" id="use-location-btn" class="secondary-btn">
             Use my location
           </button>
         </form>
-        <p class="helper-text">Tip: You can either type a city or let the browser detect your location.</p>
+
+        <p class="helper-text">
+          Tip: You can either type a city or let the browser detect your location.
+        </p>
         <p id="status-message" class="status-message"></p>
       </section>
 
-      <!-- Two-column content: weather + playlist -->
       <section id="result-section" class="panels hidden">
-        <!-- Weather panel -->
+
+        <!-- WEATHER -->
         <article class="panel panel-weather">
           <div class="panel-header">
             <div class="weather-cloud-icon">
               <i id="weather-icon-big" data-lucide="cloud"></i>
             </div>
           </div>
+
           <div class="panel-body">
             <h2 id="result-location" class="location-text">–</h2>
             <p id="weather-description" class="weather-desc">–</p>
             <p id="weather-temp" class="weather-temp-large">–</p>
             <span id="result-mood" class="mood-chip">–</span>
           </div>
+
           <div class="panel-footer">
-            <span class="badge python-badge">
-               Data via Python Backend
-            </span>
+              <span class="badge python-badge">
+                Data via Python Backend
+              </span>
           </div>
         </article>
 
-        <!-- Playlist panel -->
+        <!-- PLAYLIST -->
         <article class="panel panel-playlist">
           <div class="panel-header playlist-header">
             <div class="playlist-cover">
-              <!-- purely decorative; real cover could come from API later -->
               <div class="cover-overlay"></div>
             </div>
+
             <div class="playlist-header-text">
               <h3 id="playlist-name" class="playlist-title">
                 Mood Playlist
@@ -91,20 +99,12 @@
           </div>
 
           <div class="panel-body playlist-body">
-            <ul id="playlist-tracks" class="track-list">
-
-            </ul>
+            <ul id="playlist-tracks" class="track-list"></ul>
 
             <div class="player-bar">
-              <button class="player-btn" type="button" aria-label="Previous">
-                ◀
-              </button>
-              <button class="player-btn play-btn" type="button" aria-label="Play">
-                ▶
-              </button>
-              <button class="player-btn" type="button" aria-label="Next">
-                ▶▶
-              </button>
+              <button class="player-btn">◀</button>
+              <button class="player-btn play-btn">▶</button>
+              <button class="player-btn">▶▶</button>
               <div class="player-slider">
                 <div class="player-slider-fill"></div>
               </div>
@@ -112,22 +112,82 @@
           </div>
 
           <div class="panel-footer playlist-footer">
-            <a
-              id="playlist-link"
-              href="#"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="badge orange-badge"
-            >
-               Open playlist (Audius)
+            <a id="playlist-link" href="#" target="_blank" class="badge orange-badge">
+              Open playlist (Audius)
             </a>
           </div>
         </article>
-      </section>
-    </main>
-  </div>
 
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="/static/app.js"></script>
+      </section>
+    </div>
+
+    <!-- ================= POMODORO VIEW ================= -->
+    <section id="pomodoro-view" class="hidden">
+      <div class="pomodoro-page-wrapper">
+        <div class="pomodoro-inner">
+
+          <div class="pomodoro-topline">
+            <div class="pomodoro-mini-brand">Focus Mode</div>
+
+            <div class="pomodoro-quote-inline">
+              “Life begins at the end of your comfort zone.”
+            </div>
+          </div>
+
+          <div class="pomodoro-center">
+            <h1 class="pomodoro-task">Focus session</h1>
+
+            <div id="timer" class="pomodoro-timer">25:00</div>
+
+            <div class="pomodoro-controls">
+              <button class="pomodoro-main-btn" onclick="startTimer()">Start</button>
+              <button class="pomodoro-icon-btn" onclick="pauseTimer()">Pause</button>
+              <button class="pomodoro-icon-btn" onclick="resetTimer()">Reset</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  lucide.createIcons();
+</script>
+
+<script src="/static/app.js"></script>
+<script src="/static/pomodoro.js"></script>
+
+<!-- VIEW SWITCHING -->
+<script>
+  const navHome = document.getElementById("nav-home");
+  const navPomodoro = document.getElementById("nav-pomodoro");
+
+  const homeView = document.getElementById("home-view");
+  const pomodoroView = document.getElementById("pomodoro-view");
+
+  navHome.addEventListener("click", (e) => {
+    e.preventDefault();
+    homeView.classList.remove("hidden");
+    pomodoroView.classList.add("hidden");
+
+    navHome.classList.add("active");
+    navPomodoro.classList.remove("active");
+  });
+
+  navPomodoro.addEventListener("click", (e) => {
+    e.preventDefault();
+    homeView.classList.add("hidden");
+    pomodoroView.classList.remove("hidden");
+
+    navHome.classList.remove("active");
+    navPomodoro.classList.add("active");
+  });
+</script>
+
 </body>
 </html>
