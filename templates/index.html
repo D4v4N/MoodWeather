@@ -13,7 +13,6 @@
 
 <div class="shell">
 
-  <!-- NAVBAR -->
   <header class="glass-nav">
     <div class="nav-left">
       <div class="logo-icon">
@@ -30,12 +29,9 @@
     </nav>
   </header>
 
-  <!-- MAIN -->
   <main class="glass-main">
 
-    <!-- ================= HOME VIEW ================= -->
     <div id="home-view">
-
       <section class="search-bar">
         <form id="location-form" class="search-form">
           <input
@@ -58,8 +54,6 @@
       </section>
 
       <section id="result-section" class="panels hidden">
-
-        <!-- WEATHER -->
         <article class="panel panel-weather">
           <div class="panel-header">
             <div class="weather-cloud-icon">
@@ -81,7 +75,6 @@
           </div>
         </article>
 
-        <!-- PLAYLIST -->
         <article class="panel panel-playlist">
           <div class="panel-header playlist-header">
             <div class="playlist-cover">
@@ -89,9 +82,7 @@
             </div>
 
             <div class="playlist-header-text">
-              <h3 id="playlist-name" class="playlist-title">
-                Mood Playlist
-              </h3>
+              <h3 id="playlist-name" class="playlist-title">Mood Playlist</h3>
               <p id="playlist-description" class="playlist-subtitle">
                 Cozy rain vibes, lo-fi beats & chill tunes.
               </p>
@@ -102,9 +93,9 @@
             <ul id="playlist-tracks" class="track-list"></ul>
 
             <div class="player-bar">
-              <button class="player-btn">◀</button>
-              <button class="player-btn play-btn">▶</button>
-              <button class="player-btn">▶▶</button>
+              <button class="player-btn" type="button">◀</button>
+              <button class="player-btn play-btn" type="button">▶</button>
+              <button class="player-btn" type="button">▶▶</button>
               <div class="player-slider">
                 <div class="player-slider-fill"></div>
               </div>
@@ -112,20 +103,23 @@
           </div>
 
           <div class="panel-footer playlist-footer">
-            <a id="playlist-link" href="#" target="_blank" class="badge orange-badge">
+            <a
+                    id="playlist-link"
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="badge orange-badge"
+            >
               Open playlist (Audius)
             </a>
           </div>
         </article>
-
       </section>
     </div>
 
-    <!-- ================= POMODORO VIEW ================= -->
     <section id="pomodoro-view" class="hidden">
       <div class="pomodoro-page-wrapper">
         <div class="pomodoro-inner">
-
           <div class="pomodoro-topline">
             <div class="pomodoro-mini-brand">Focus Mode</div>
 
@@ -140,12 +134,27 @@
             <div id="timer" class="pomodoro-timer">25:00</div>
 
             <div class="pomodoro-controls">
-              <button class="pomodoro-main-btn" onclick="startTimer()">Start</button>
-              <button class="pomodoro-icon-btn" onclick="pauseTimer()">Pause</button>
-              <button class="pomodoro-icon-btn" onclick="resetTimer()">Reset</button>
+              <button class="pomodoro-main-btn" type="button" onclick="startTimer()">Start</button>
+              <button class="pomodoro-icon-btn" type="button" onclick="pauseTimer()">Pause</button>
+              <button class="pomodoro-icon-btn" type="button" onclick="resetTimer()">Reset</button>
+            </div>
+
+            <div class="pomodoro-presets">
+              <p class="preset-title">Study session</p>
+              <div class="study-circles">
+                <button class="study-circle" type="button" onclick="setTimerMinutes(45)">45</button>
+                <button class="study-circle" type="button" onclick="setTimerMinutes(60)">60</button>
+                <button class="study-circle" type="button" onclick="setTimerMinutes(75)">75</button>
+              </div>
+
+              <p class="preset-title break-title">Break</p>
+              <div class="break-buttons">
+                <button class="pomodoro-icon-btn small" type="button" onclick="setTimerMinutes(5)">5 min</button>
+                <button class="pomodoro-icon-btn small" type="button" onclick="setTimerMinutes(10)">10 min</button>
+                <button class="pomodoro-icon-btn small" type="button" onclick="setTimerMinutes(15)">15 min</button>
+              </div>
             </div>
           </div>
-
         </div>
       </div>
     </section>
@@ -153,41 +162,39 @@
   </main>
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
   lucide.createIcons();
 </script>
 
 <script src="/static/app.js"></script>
-<script src="/static/pomodoro.js"></script>
+<script src="/static/pomodoro.js?v=99"></script>
 
-<!-- VIEW SWITCHING -->
 <script>
   const navHome = document.getElementById("nav-home");
   const navPomodoro = document.getElementById("nav-pomodoro");
-
   const homeView = document.getElementById("home-view");
   const pomodoroView = document.getElementById("pomodoro-view");
 
-  navHome.addEventListener("click", (e) => {
-    e.preventDefault();
-    homeView.classList.remove("hidden");
-    pomodoroView.classList.add("hidden");
+  if (navHome && navPomodoro && homeView && pomodoroView) {
+    navHome.addEventListener("click", (e) => {
+      e.preventDefault();
+      homeView.classList.remove("hidden");
+      pomodoroView.classList.add("hidden");
 
-    navHome.classList.add("active");
-    navPomodoro.classList.remove("active");
-  });
+      navHome.classList.add("active");
+      navPomodoro.classList.remove("active");
+    });
 
-  navPomodoro.addEventListener("click", (e) => {
-    e.preventDefault();
-    homeView.classList.add("hidden");
-    pomodoroView.classList.remove("hidden");
+    navPomodoro.addEventListener("click", (e) => {
+      e.preventDefault();
+      homeView.classList.add("hidden");
+      pomodoroView.classList.remove("hidden");
 
-    navHome.classList.remove("active");
-    navPomodoro.classList.add("active");
-  });
+      navHome.classList.remove("active");
+      navPomodoro.classList.add("active");
+    });
+  }
 </script>
-
 </body>
 </html>

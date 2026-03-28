@@ -1,11 +1,17 @@
-let timeLeft = 25 * 60;
+console.log("pomodoro.js loaded");
+
+let defaultMinutes = 25;
+let timeLeft = defaultMinutes * 60;
 let timerInterval = null;
 
 function updateTimer() {
+    const timerEl = document.getElementById("timer");
+    if (!timerEl) return;
+
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
 
-    document.getElementById("timer").textContent =
+    timerEl.textContent =
         `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
@@ -19,6 +25,7 @@ function startTimer() {
         } else {
             clearInterval(timerInterval);
             timerInterval = null;
+
             const audio = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
             audio.play();
         }
@@ -33,8 +40,21 @@ function pauseTimer() {
 function resetTimer() {
     clearInterval(timerInterval);
     timerInterval = null;
-    timeLeft = 25 * 60;
+    timeLeft = defaultMinutes * 60;
     updateTimer();
 }
+
+function setTimerMinutes(minutes) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    defaultMinutes = minutes;
+    timeLeft = minutes * 60;
+    updateTimer();
+}
+
+window.startTimer = startTimer;
+window.pauseTimer = pauseTimer;
+window.resetTimer = resetTimer;
+window.setTimerMinutes = setTimerMinutes;
 
 updateTimer();

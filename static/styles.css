@@ -825,3 +825,81 @@ body {
     align-items: center;
   }
 }
+
+.pomodoro-presets {
+  margin-top: 34px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.preset-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  margin: 0 0 14px;
+  letter-spacing: 0.04em;
+}
+
+.break-title {
+  margin-top: 26px;
+}
+
+.study-circles {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.study-circle {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.12);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: all 0.18s ease;
+}
+
+.study-circle:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: rgba(255,255,255,0.18);
+}
+
+.break-buttons {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pomodoro-icon-btn.small {
+  min-width: 110px;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .study-circle {
+    width: 64px;
+    height: 64px;
+    font-size: 1rem;
+  }
+
+  .break-buttons {
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pomodoro-icon-btn.small {
+    width: 100%;
+    max-width: 260px;
+  }
+}
